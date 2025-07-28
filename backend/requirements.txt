@@ -1,0 +1,28 @@
+# FastAPI and web server dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+python-multipart==0.0.6
+
+# LangChain RAG Pipeline Dependencies
+langchain
+langchain-openai
+langchain-pinecone
+langchain-community
+
+# Database and caching dependencies
+asyncpg
+redis
+psycopg2-binary
+
+# OpenAI and Pinecone
+openai
+pinecone-client
+tiktoken
+
+# Utilities
+python-dotenv
+httpx
+
+# CORS support
+python-jose[cryptography]

@@ -1,0 +1,90 @@
+version: '3.8'
+
+# Development override for docker-compose.yml
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  # Redis with development settings
+  redis:
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf --loglevel verbose
+
+  # Backend with development settings
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development  # If multi-stage build is used
+    environment:
+      - LOG_LEVEL=DEBUG
+      - RELOAD=true
+      - WORKERS=1
+    volumes:
+      - ./backend:/app:ro  # Mount source code for hot reload
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--log-level", "debug"]
+    ports:
+      - "8000:8000"
+      - "5678:5678"  # Debug port
+
+  # Frontend with development settings
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - BACKEND_URL=http://localhost:8000  # Direct connection for development
+      - STREAMLIT_SERVER_RUNON_SAVE=true
+    volumes:
+      - ./frontend:/app:ro  # Mount source code for hot reload
+    ports:
+      - "8501:8501"
+
+  # Ingestion service for development
+  ingestion:
+    build:
+      context: ./collab
+      dockerfile: Dockerfile
+    environment:
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ./collab:/app:ro  # Mount source code
+      - ./data:/app/data
+      - ./logs:/app/logs
+    profiles: []  # Remove profile restriction for development
+
+  # Development database viewer (optional)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: genai-devops-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - genai-network
+    profiles:
+      - tools
+
+# Development-specific volumes
+volumes:
+  # Use bind mounts for development to enable hot reload
+  backend_dev:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./backend
+  frontend_dev:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./frontend

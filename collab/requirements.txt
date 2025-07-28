@@ -1,0 +1,44 @@
+# LangChain RAG Pipeline Dependencies for Collab Folder
+# Using latest versions without pinning - let pip resolve compatibility automatically
+langchain
+langchain-openai
+langchain-pinecone
+langchain-community
+
+# Document loaders
+pypdf
+beautifulsoup4
+requests
+unstructured
+python-multipart
+
+# Pinecone
+pinecone-client
+
+# OpenAI
+openai
+
+# Text processing
+tiktoken
+
+# Interactive interface
+jupyter
+ipywidgets
+tqdm
+
+# Utilities
+python-dotenv
+pydantic
+
+# Additional dependencies for GitHub codebase loading
+gitpython
+pygithub
+
+# Database and caching dependencies
+asyncpg
+redis
+psycopg2-binary
+
+# Testing dependencies
+pytest
+pytest-asyncio

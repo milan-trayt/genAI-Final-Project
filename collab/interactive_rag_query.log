@@ -1,0 +1,477 @@
+2025-07-28 02:20:23,123 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:20:23,123 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:20:23,124 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:20:23,124 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:20:23,126 - database_manager - ERROR - Database initialization failed: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-28 02:20:23,128 - redis_manager - ERROR - Redis initialization failed: Error Multiple exceptions: [Errno 111] Connect call failed ('::1', 6379, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 6379) connecting to localhost:6379.
+2025-07-28 02:20:23,128 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:20:23,128 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:20:23,128 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:20:23,128 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:20:23,185 - query_processor - ERROR - Failed to initialize query processor: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:20:23,245 - error_handler - CRITICAL - [application:initialization] "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:20:24,518 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2025-07-28 02:20:24,525 - error_handler - WARNING - Failed to generate custom error message: Error code: 403 - {'error': {'message': 'Project `proj_iV1lV2ZI3jUpnRjqSDdBE9JH` does not have access to model `gpt-3.5-turbo`', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+2025-07-28 02:20:24,525 - error_handler - CRITICAL - Critical error in application: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:20:24,526 - interactive_rag_query - CRITICAL - Failed to initialize application: Invalid input detected. Please check your query and try again.
+2025-07-28 02:20:24,526 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:23:27,996 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:23:27,996 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:23:27,996 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:23:27,996 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:23:28,035 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:23:28,037 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:23:28,037 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:23:28,037 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:23:28,038 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:23:28,038 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:23:28,038 - query_processor - ERROR - Failed to initialize query processor: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:23:28,090 - error_handler - CRITICAL - [application:initialization] pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:23:29,016 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2025-07-28 02:23:29,019 - error_handler - WARNING - Failed to generate custom error message: Error code: 403 - {'error': {'message': 'Project `proj_iV1lV2ZI3jUpnRjqSDdBE9JH` does not have access to model `gpt-4`', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+2025-07-28 02:23:29,019 - error_handler - CRITICAL - Critical error in application: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:23:29,019 - interactive_rag_query - CRITICAL - Failed to initialize application: Invalid input detected. Please check your query and try again.
+2025-07-28 02:23:29,019 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:27:34,829 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:27:34,829 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:27:34,829 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:27:34,829 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:27:34,832 - database_manager - ERROR - Database initialization failed: Multiple exceptions: [Errno 111] Connect call failed ('::1', 5432, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 5432)
+2025-07-28 02:27:34,833 - redis_manager - ERROR - Redis initialization failed: Error Multiple exceptions: [Errno 111] Connect call failed ('::1', 6379, 0, 0), [Errno 111] Connect call failed ('127.0.0.1', 6379) connecting to localhost:6379.
+2025-07-28 02:27:34,833 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:27:34,833 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:27:34,833 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:27:34,833 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:27:34,886 - query_processor - ERROR - Failed to initialize query processor: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:27:34,889 - error_handler - CRITICAL - [application:initialization] "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:27:35,799 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 403 Forbidden"
+2025-07-28 02:27:35,801 - error_handler - WARNING - Failed to generate custom error message: Error code: 403 - {'error': {'message': 'Project `proj_iV1lV2ZI3jUpnRjqSDdBE9JH` does not have access to model `gpt-3.5-turbo`', 'type': 'invalid_request_error', 'param': None, 'code': 'model_not_found'}}
+2025-07-28 02:27:35,801 - error_handler - CRITICAL - Critical error in application: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:27:35,801 - interactive_rag_query - CRITICAL - Failed to initialize application: Invalid input detected. Please check your query and try again.
+2025-07-28 02:27:35,802 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:30:14,370 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:30:14,371 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:30:14,371 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:30:14,371 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:30:14,413 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:30:14,416 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:30:14,416 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:30:14,416 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:30:14,416 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:30:14,416 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:30:14,416 - query_processor - ERROR - Failed to initialize query processor: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:30:14,418 - error_handler - CRITICAL - [application:initialization] pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:30:17,617 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:30:17,625 - error_handler - CRITICAL - Critical error in application: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:30:17,625 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there was a problem starting the application. This error usually happens if some information was provided incorrectly or twice. Please try restarting the app or double-checking any input you provided. If the issue continues, feel free to reach out for help— we're here to assist!
+2025-07-28 02:30:17,625 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:35:41,301 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:35:41,308 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:35:41,308 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:35:41,308 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:35:41,343 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:35:41,346 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:35:41,346 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:35:41,346 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:35:41,346 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:35:41,346 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:35:41,346 - query_processor - ERROR - Failed to initialize query processor: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:35:41,348 - error_handler - CRITICAL - [application:initialization] pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:35:44,915 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:35:44,932 - error_handler - CRITICAL - Critical error in application: pydantic.main.BaseModel.__init__() got multiple values for keyword argument 'model'
+2025-07-28 02:35:44,932 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there was a problem starting the application. This error usually happens if something in the setup was entered incorrectly. Please try restarting the application or double-checking any recent changes. If the issue continues, contact support for help. We're here to assist you!
+2025-07-28 02:35:44,932 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:36:29,073 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:36:29,073 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:36:29,073 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:36:29,073 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:36:29,109 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:36:29,112 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:36:29,112 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:36:29,112 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:36:29,112 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:36:29,112 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:36:29,178 - query_processor - ERROR - Failed to initialize query processor: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:36:29,181 - error_handler - CRITICAL - [application:initialization] "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:36:31,803 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:36:31,818 - error_handler - CRITICAL - Critical error in application: "WorkingOpenAIEmbeddings" object has no field "cache_manager"
+2025-07-28 02:36:31,818 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there's an issue with the application's setup related to the "WorkingOpenAIEmbeddings" feature. This might be due to a missing or outdated component. Please try restarting the application or updating it to the latest version. If the problem persists, contact support for further assistance. We're here to help!
+2025-07-28 02:36:31,819 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:37:07,344 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:37:07,345 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:37:07,345 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:37:07,345 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:37:07,380 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:37:07,382 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:37:07,382 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:37:07,382 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:37:07,383 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:37:07,383 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:37:12,211 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:37:12,214 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:37:14,711 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:37:14,712 - query_processor - ERROR - Failed to initialize query processor: module 'pinecone' has no attribute 'Index'
+2025-07-28 02:37:14,724 - error_handler - CRITICAL - [application:initialization] module 'pinecone' has no attribute 'Index'
+2025-07-28 02:37:16,865 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:37:16,876 - error_handler - CRITICAL - Critical error in application: module 'pinecone' has no attribute 'Index'
+2025-07-28 02:37:16,876 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there's an issue with the application's setup. The system couldn't find a part called 'Index' in the 'pinecone' module, which might mean something didn't install or update correctly. Please try restarting the application or checking for updates. If the problem continues, contact support for help. We're here to get you back on track!
+2025-07-28 02:37:16,877 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:38:11,500 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:38:11,500 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:38:11,500 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:38:11,500 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:38:11,532 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:38:11,535 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:38:11,535 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:38:11,535 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:38:11,535 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:38:11,535 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:38:13,816 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:38:13,822 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:38:16,163 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:38:16,164 - query_processor - ERROR - Failed to initialize query processor: module 'pinecone' has no attribute 'Index'
+2025-07-28 02:38:16,168 - error_handler - CRITICAL - [application:initialization] module 'pinecone' has no attribute 'Index'
+2025-07-28 02:38:18,646 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:38:18,654 - error_handler - CRITICAL - Critical error in application: module 'pinecone' has no attribute 'Index'
+2025-07-28 02:38:18,654 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there's an issue with the application's setup. This error suggests that a part of the program couldn't find a specific feature it needs. Don't worry—try restarting the application or checking for updates. If the problem persists, please contact support, and we'll help you get back on track!
+2025-07-28 02:38:18,655 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:39:17,811 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:39:17,811 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:39:17,811 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:39:17,811 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:39:17,849 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:39:17,852 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:39:17,852 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:39:17,852 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:39:17,852 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:39:17,852 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:39:19,637 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:39:19,641 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:39:21,957 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:39:21,969 - query_processor - ERROR - Failed to initialize query processor: "EnhancedVectorStoreRetriever" object has no field "vectorstore"
+2025-07-28 02:39:21,972 - error_handler - CRITICAL - [application:initialization] "EnhancedVectorStoreRetriever" object has no field "vectorstore"
+2025-07-28 02:39:24,460 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:39:24,468 - error_handler - CRITICAL - Critical error in application: "EnhancedVectorStoreRetriever" object has no field "vectorstore"
+2025-07-28 02:39:24,469 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there's a small issue with the setup. The system couldn't find the "vectorstore" part it needs to get started. Please double-check your configuration or settings, and try again. If you're unsure, reaching out to support can help get things back on track. We're here to help!
+2025-07-28 02:39:24,471 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:39:59,771 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:39:59,771 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:39:59,771 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:39:59,771 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:39:59,807 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:39:59,809 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:39:59,810 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:39:59,810 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:39:59,810 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:39:59,810 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:40:01,712 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:40:01,715 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:40:04,103 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:40:04,113 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:40:04,116 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:40:04,159 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:40:04,160 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:40:04,160 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:40:04,161 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:40:04,161 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:40:04,162 - menu_system - ERROR - Failed to initialize menu system: "OneTimeQueryTool" object has no field "rag_chain"
+2025-07-28 02:40:04,164 - error_handler - CRITICAL - [application:initialization] "OneTimeQueryTool" object has no field "rag_chain"
+2025-07-28 02:40:06,515 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:40:06,523 - error_handler - CRITICAL - Critical error in application: "OneTimeQueryTool" object has no field "rag_chain"
+2025-07-28 02:40:06,523 - interactive_rag_query - CRITICAL - Failed to initialize application: Oops! It looks like there's an issue with the setup. The system couldn't find a specific feature called "rag_chain" that's needed to start properly. Please try refreshing the page or restarting the application. If the problem continues, contact support for help. We're here to assist you!
+2025-07-28 02:40:06,523 - interactive_rag_query - ERROR - Failed to initialize application
+2025-07-28 02:42:08,008 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:42:08,008 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:42:08,008 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:42:08,008 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:42:08,040 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:42:08,042 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:42:08,042 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:42:08,042 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:42:08,043 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:42:08,043 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:42:11,395 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:42:11,402 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:42:13,555 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:42:13,574 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:42:13,576 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:42:13,620 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:42:13,622 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:42:13,622 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:42:13,622 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:42:13,622 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:42:13,623 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 02:42:13,623 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 02:42:13,623 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 02:42:15,228 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:42:16,663 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 02:43:24,008 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:43:24,712 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:43:26,221 - rag_chain - ERROR - RAG chain error: 'OpenAI' object has no attribute 'create'
+2025-07-28 02:43:26,221 - rag_chain - ERROR - One-shot query failed: 'OpenAI' object has no attribute 'create'
+2025-07-28 02:43:35,753 - interactive_rag_query - INFO - 🛑 Shutting down Interactive RAG Query System...
+2025-07-28 02:43:35,754 - menu_system - INFO - Menu system closed
+2025-07-28 02:43:35,754 - rag_chain - INFO - RAG chain closed
+2025-07-28 02:43:35,754 - session_manager - INFO - Session manager closed
+2025-07-28 02:43:35,758 - query_processor - INFO - Query processor closed
+2025-07-28 02:43:35,758 - cache_manager - INFO - Cache manager closed
+2025-07-28 02:43:35,766 - interactive_rag_query - INFO - ✅ Shutdown completed successfully
+2025-07-28 02:47:23,742 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:47:23,742 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:47:23,742 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:47:23,742 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:47:23,774 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:47:23,777 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:47:23,777 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:47:23,777 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:47:23,777 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:47:23,777 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:47:26,701 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:47:26,705 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:47:28,738 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:47:28,754 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:47:28,756 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:47:28,758 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:47:28,759 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:47:28,759 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:47:28,759 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:47:28,759 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:47:28,760 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 02:47:28,760 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 02:47:28,760 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 02:47:31,088 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:47:32,724 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 02:47:49,724 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:47:50,542 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:48:02,934 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:48:05,085 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:48:05,096 - rag_chain - INFO - One-shot query completed in 14.59s
+2025-07-28 02:48:45,184 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:48:45,535 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:48:48,812 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:48:50,246 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:48:50,255 - rag_chain - INFO - One-shot query completed in 5.29s
+2025-07-28 02:49:09,766 - database_manager - INFO - Created new session session_56835699 for tab interactive
+2025-07-28 02:49:09,766 - session_manager - INFO - Created new session session_56835699 with buffer memory
+2025-07-28 02:49:36,318 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:49:42,172 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:51:16,725 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:41,168 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:41,341 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:47,400 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:47,580 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:47,748 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:47,907 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:56,563 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:51:56,735 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:52:35,227 - interactive_rag_query - INFO - Received signal 2, initiating graceful shutdown...
+2025-07-28 02:53:38,062 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:53:38,063 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:53:38,063 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:53:38,063 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:53:38,095 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:53:38,097 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:53:38,097 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:53:38,097 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:53:38,097 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:53:38,097 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:53:41,752 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:53:41,756 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:53:43,818 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:53:43,826 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:53:43,828 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:53:43,829 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:53:43,830 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:53:43,830 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:53:43,830 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:53:43,830 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:53:43,831 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 02:53:43,831 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 02:53:43,831 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 02:53:44,926 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:53:46,462 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 02:53:52,999 - database_manager - INFO - Created new session session_49822dda for tab interactive
+2025-07-28 02:53:53,000 - session_manager - INFO - Created new session session_49822dda with buffer memory
+2025-07-28 02:54:18,599 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:54:18,600 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:54:18,600 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:54:18,600 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:54:18,636 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:54:18,639 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:54:18,639 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:54:18,639 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:54:18,639 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:54:18,639 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:54:21,384 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:54:21,390 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:54:24,042 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:54:24,058 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:54:24,061 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:54:24,063 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:54:24,065 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:54:24,065 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:54:24,065 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:54:24,065 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:54:24,067 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 02:54:24,067 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 02:54:24,067 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 02:54:25,271 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:54:26,909 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 02:54:44,264 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 02:54:44,265 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 02:54:44,265 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 02:54:44,265 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 02:54:44,297 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 02:54:44,299 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 02:54:44,299 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 02:54:44,299 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 02:54:44,300 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 02:54:44,300 - query_processor - INFO - Initializing query processor...
+2025-07-28 02:54:45,956 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:54:45,962 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 02:54:47,900 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 02:54:47,909 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 02:54:47,911 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 02:54:47,912 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 02:54:47,913 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 02:54:47,913 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 02:54:47,913 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 02:54:47,913 - menu_system - INFO - Initializing menu system...
+2025-07-28 02:54:47,913 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 02:54:47,913 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 02:54:47,914 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 02:54:48,310 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:54:49,846 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 02:55:16,672 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:55:17,698 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:55:21,488 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:55:21,888 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:55:21,912 - rag_chain - INFO - One-shot query completed in 6.59s
+2025-07-28 02:55:55,127 - database_manager - INFO - Deleted session session_49822dda
+2025-07-28 02:55:55,127 - session_manager - INFO - Deleted session session_49822dda
+2025-07-28 02:56:26,177 - session_manager - INFO - Loaded session session_56835699
+2025-07-28 02:56:38,068 - database_manager - INFO - Deleted session session_56835699
+2025-07-28 02:56:38,069 - session_manager - INFO - Deleted session session_56835699
+2025-07-28 02:56:49,184 - database_manager - INFO - Created new session session_a3caee9f for tab interactive
+2025-07-28 02:56:49,184 - session_manager - INFO - Created new session session_a3caee9f with buffer memory
+2025-07-28 02:57:08,184 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:57:20,890 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:57:20,895 - rag_chain - INFO - Conversational query completed in 15.92s
+2025-07-28 02:57:56,376 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:57:57,876 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:58:04,535 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:58:04,538 - rag_chain - INFO - Conversational query completed in 9.62s
+2025-07-28 02:58:43,762 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:58:45,829 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 02:58:47,672 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 02:58:47,675 - rag_chain - INFO - Conversational query completed in 4.52s
+2025-07-28 02:59:13,156 - interactive_rag_query - INFO - 🛑 Shutting down Interactive RAG Query System...
+2025-07-28 02:59:13,156 - menu_system - INFO - Menu system closed
+2025-07-28 02:59:13,156 - rag_chain - INFO - RAG chain closed
+2025-07-28 02:59:13,156 - session_manager - INFO - Session manager closed
+2025-07-28 02:59:13,159 - query_processor - INFO - Query processor closed
+2025-07-28 02:59:13,160 - cache_manager - INFO - Cache manager closed
+2025-07-28 02:59:13,285 - session_manager - ERROR - Failed to load messages for session session_a3caee9f: pool is closing
+2025-07-28 02:59:13,286 - session_manager - ERROR - Failed to save message for session session_a3caee9f: got result for unknown protocol state 3
+2025-07-28 02:59:13,286 - session_manager - ERROR - Failed to save message for session session_a3caee9f: got result for unknown protocol state 3
+2025-07-28 02:59:13,287 - session_manager - ERROR - Failed to load messages for session session_a3caee9f: pool is closing
+2025-07-28 02:59:13,287 - session_manager - ERROR - Failed to save message for session session_a3caee9f: got result for unknown protocol state 3
+2025-07-28 02:59:13,288 - session_manager - ERROR - Failed to save message for session session_a3caee9f: got result for unknown protocol state 3
+2025-07-28 02:59:13,294 - interactive_rag_query - INFO - ✅ Shutdown completed successfully
+2025-07-28 03:04:18,465 - interactive_rag_query - INFO - 🔍 Validating system configuration...
+2025-07-28 03:04:18,465 - interactive_rag_query - INFO - ✅ Configuration validation passed
+2025-07-28 03:04:18,465 - interactive_rag_query - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 03:04:18,465 - interactive_rag_query - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 03:04:18,500 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 03:04:18,503 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 03:04:18,503 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 03:04:18,503 - interactive_rag_query - INFO - ✅ Infrastructure components initialized
+2025-07-28 03:04:18,503 - interactive_rag_query - INFO - 🧠 Initializing core RAG components...
+2025-07-28 03:04:18,503 - query_processor - INFO - Initializing query processor...
+2025-07-28 03:04:21,876 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:04:21,882 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 03:04:24,268 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 03:04:24,295 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 03:04:24,298 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 03:04:24,300 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 03:04:24,302 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 03:04:24,302 - interactive_rag_query - INFO - ✅ Core RAG components initialized
+2025-07-28 03:04:24,302 - interactive_rag_query - INFO - 🎯 Initializing application layer...
+2025-07-28 03:04:24,303 - menu_system - INFO - Initializing menu system...
+2025-07-28 03:04:24,304 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 03:04:24,304 - interactive_rag_query - INFO - ✅ Application layer initialized
+2025-07-28 03:04:24,304 - interactive_rag_query - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 03:04:25,255 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:04:26,710 - interactive_rag_query - INFO - 🎯 Starting interactive menu system...
+2025-07-28 03:04:44,505 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:04:45,315 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:04:57,009 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:04:58,507 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:04:58,530 - rag_chain - INFO - One-shot query completed in 13.89s
+2025-07-28 03:05:38,922 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:05:39,878 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:05:50,191 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:05:50,661 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:05:50,669 - rag_chain - INFO - One-shot query completed in 12.61s
+2025-07-28 03:07:56,227 - database_manager - INFO - Created new session session_7b8aab68 for tab interactive
+2025-07-28 03:07:56,227 - session_manager - INFO - Created new session session_7b8aab68 with buffer memory
+2025-07-28 03:08:01,249 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:08:05,654 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:08:05,657 - rag_chain - INFO - Conversational query completed in 6.54s
+2025-07-28 03:08:56,030 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:08:56,476 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:09:06,552 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:09:06,555 - rag_chain - INFO - Conversational query completed in 11.72s
+2025-07-28 03:09:45,149 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:09:49,347 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 03:09:59,058 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 03:09:59,066 - rag_chain - INFO - Conversational query completed in 15.48s
+2025-07-28 03:10:13,706 - interactive_rag_query - INFO - 🛑 Shutting down Interactive RAG Query System...
+2025-07-28 03:10:13,706 - menu_system - INFO - Menu system closed
+2025-07-28 03:10:13,706 - rag_chain - INFO - RAG chain closed
+2025-07-28 03:10:13,706 - session_manager - INFO - Session manager closed
+2025-07-28 03:10:13,707 - query_processor - INFO - Query processor closed
+2025-07-28 03:10:13,707 - cache_manager - INFO - Cache manager closed
+2025-07-28 03:10:13,717 - session_manager - ERROR - Failed to load messages for session session_7b8aab68: pool is closing
+2025-07-28 03:10:13,799 - session_manager - ERROR - Failed to save message for session session_7b8aab68: got result for unknown protocol state 3
+2025-07-28 03:10:13,799 - session_manager - ERROR - Failed to save message for session session_7b8aab68: got result for unknown protocol state 3
+2025-07-28 03:10:13,800 - session_manager - ERROR - Failed to save message for session session_7b8aab68: got result for unknown protocol state 3
+2025-07-28 03:10:13,800 - session_manager - ERROR - Failed to save message for session session_7b8aab68: got result for unknown protocol state 3
+2025-07-28 03:10:13,804 - interactive_rag_query - INFO - ✅ Shutdown completed successfully
+2025-07-28 09:53:04,872 - __main__ - INFO - 🔍 Validating system configuration...
+2025-07-28 09:53:04,873 - __main__ - INFO - ✅ Configuration validation passed
+2025-07-28 09:53:04,873 - __main__ - INFO - 🚀 Initializing Interactive RAG Query System...
+2025-07-28 09:53:04,873 - __main__ - INFO - 🔧 Initializing infrastructure components...
+2025-07-28 09:53:04,899 - database_manager - INFO - Database manager initialized successfully
+2025-07-28 09:53:04,901 - redis_manager - INFO - Redis manager initialized successfully
+2025-07-28 09:53:04,901 - cache_manager - INFO - Cache manager initialized successfully
+2025-07-28 09:53:04,901 - __main__ - INFO - ✅ Infrastructure components initialized
+2025-07-28 09:53:04,901 - __main__ - INFO - 🧠 Initializing core RAG components...
+2025-07-28 09:53:04,901 - query_processor - INFO - Initializing query processor...
+2025-07-28 09:53:05,996 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 09:53:05,999 - query_processor - INFO - ✅ OpenAI embeddings working (dimension: 1536)
+2025-07-28 09:53:08,581 - query_processor - INFO - ✅ Connected to existing Pinecone index
+2025-07-28 09:53:08,594 - query_processor - INFO - ✅ Query processor initialized successfully
+2025-07-28 09:53:08,595 - session_manager - INFO - Session manager initialized successfully
+2025-07-28 09:53:08,596 - rag_chain - INFO - Initializing RAG chains...
+2025-07-28 09:53:08,596 - rag_chain - INFO - ✅ RAG chains initialized successfully
+2025-07-28 09:53:08,596 - __main__ - INFO - ✅ Core RAG components initialized
+2025-07-28 09:53:08,596 - __main__ - INFO - 🎯 Initializing application layer...
+2025-07-28 09:53:08,596 - menu_system - INFO - Initializing menu system...
+2025-07-28 09:53:08,597 - menu_system - INFO - ✅ Menu system initialized successfully
+2025-07-28 09:53:08,597 - __main__ - INFO - ✅ Application layer initialized
+2025-07-28 09:53:08,597 - __main__ - INFO - ✅ Interactive RAG Query System initialized successfully!
+2025-07-28 09:53:09,555 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 09:53:10,988 - __main__ - INFO - 🎯 Starting interactive menu system...
+2025-07-28 09:53:42,819 - session_manager - INFO - Loaded session session_97d48a93
+2025-07-28 09:54:04,093 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 09:54:08,869 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 09:54:08,875 - rag_chain - INFO - Conversational query completed in 6.32s
+2025-07-28 09:54:40,016 - session_manager - INFO - Loaded session session_cad069aa
+2025-07-28 09:54:58,563 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 09:55:02,397 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 09:55:02,398 - rag_chain - INFO - Conversational query completed in 4.89s
+2025-07-28 09:55:21,858 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 09:55:23,783 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-28 09:55:26,847 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2025-07-28 09:55:26,850 - rag_chain - INFO - Conversational query completed in 6.27s

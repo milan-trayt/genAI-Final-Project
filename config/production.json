@@ -1,0 +1,66 @@
+{
+  "environment": "production",
+  "version": "1.0.0",
+  "debug": false,
+  "openai": {
+    "api_key": "sk-your-production-openai-api-key",
+    "model": "gpt-4",
+    "embedding_model": "text-embedding-ada-002",
+    "temperature": 0.1,
+    "max_tokens": 2000,
+    "timeout": 30,
+    "max_retries": 5
+  },
+  "pinecone": {
+    "api_key": "your-production-pinecone-api-key",
+    "environment": "us-west1-gcp",
+    "index_name": "genai-devops-assistant-prod",
+    "dimension": 1536,
+    "metric": "cosine",
+    "timeout": 30,
+    "max_retries": 5
+  },
+  "redis": {
+    "host": "redis.production.example.com",
+    "port": 6379,
+    "db": 0,
+    "password": "your-redis-password",
+    "ssl": true,
+    "timeout": 30,
+    "max_connections": 20
+  },
+  "security": {
+    "rate_limit_per_minute": 60,
+    "max_query_length": 2000,
+    "max_history_length": 50,
+    "session_timeout": 3600,
+    "cors_origins": [
+      "https://your-domain.com",
+      "https://www.your-domain.com"
+    ],
+    "allowed_hosts": [
+      "your-domain.com",
+      "www.your-domain.com",
+      "api.your-domain.com"
+    ],
+    "api_key_header": "X-API-Key",
+    "enable_rate_limiting": true
+  },
+  "application": {
+    "response_timeout": 30,
+    "max_context_length": 4000,
+    "top_k_retrieval": 5,
+    "cache_ttl": 3600,
+    "enable_caching": true,
+    "enable_monitoring": true,
+    "health_check_interval": 30
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "file_path": "/var/log/genai-devops-assistant/app.log",
+    "max_file_size": 52428800,
+    "backup_count": 10,
+    "enable_json_logging": true
+  }
+}
