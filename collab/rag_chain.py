@@ -218,10 +218,7 @@ Instructions:
 3. Include specific examples or code snippets when relevant
 4. Cite the sources you used from the context
 
-Answer: [Your detailed answer here]
-
-Sources:
-[List the sources you referenced, numbered 1, 2, 3, etc.]"""
+Answer: [Your detailed answer here]"""
 
         self.qa_prompt = PromptTemplate(
             template=qa_template,

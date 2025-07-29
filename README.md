@@ -19,11 +19,14 @@ The system uses a clear separation of concerns across three distinct layers:
 - PostgreSQL for persistent chat history storage
 - Multi-tab session management
 
-### 3. **Frontend** - Multi-Tab Chat Interface
-- Streamlit-based interface with multiple chat tabs
+### 3. **Frontend** - React Multi-Tab Chat Interface
+- Modern React-based interface with multiple chat tabs
 - Each tab maintains its own conversation context
 - Individual session management per tab
-- Source references and expandable citations
+- Document ingestion with real-time processing
+- Auto-close on successful ingestion
+- Multiple source addition support
+- Comprehensive error handling
 
 ## 🚀 Quick Start
 
@@ -53,9 +56,10 @@ The system uses a clear separation of concerns across three distinct layers:
    ```
 
 ### Service URLs
+- **Frontend (React):** http://localhost:3000
 - **Backend (FastAPI):** http://localhost:8000
-- **Frontend (Streamlit):** http://localhost:8501  
 - **Collab (Jupyter):** http://localhost:8888
+- **Collab API:** http://localhost:8503
 - **PostgreSQL:** localhost:5432
 - **Redis:** localhost:6379
 
@@ -74,7 +78,20 @@ The system uses a clear separation of concerns across three distinct layers:
 │   ├── rag_engine.py
 │   ├── requirements.txt
 │   └── Dockerfile
-├── frontend/                  # Streamlit Frontend
+├── react-frontend/            # React Frontend
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── ChatInterface.js
+│   │   │   ├── IngestionInterface.js
+│   │   │   └── QueryTypeSelector.js
+│   │   ├── App.js
+│   │   └── index.js
+│   ├── public/
+│   ├── package.json
+│   ├── Dockerfile
+│   ├── Dockerfile.dev
+│   └── nginx.conf
+├── frontend/                  # Legacy Streamlit Frontend
 │   ├── app.py
 │   ├── requirements.txt
 │   └── Dockerfile
@@ -107,7 +124,10 @@ curl http://localhost:8000/health
 
 ### 3. Frontend Development
 ```bash
-# Access multi-tab chat interface
+# Access React multi-tab chat interface
+open http://localhost:3000
+
+# Legacy Streamlit interface (if needed)
 open http://localhost:8501
 ```
 
@@ -115,16 +135,35 @@ open http://localhost:8501
 
 ### LangChain Integration
 - **Document Loaders:** PyPDFLoader, WebBaseLoader, ConfluenceLoader, GitHubIssuesLoader
+- **JavaScript Support:** SeleniumURLLoader for React, Vue, Angular, and SPA websites
 - **Text Processing:** RecursiveCharacterTextSplitter for optimal chunking
 - **Embeddings:** OpenAI text-embedding-ada-002 via LangChain
 - **Vector Store:** PineconeVectorStore for seamless integration
 - **Chat Models:** ChatOpenAI with prompt templates and output parsers
 
-### Multi-Tab Chat Interface
+### Enhanced Web Loading
+- **JavaScript-Heavy Sites:** Automatic Selenium support for modern web applications
+- **Smart Fallback:** Graceful degradation from Selenium → WebBaseLoader
+- **Configurable Waits:** Wait for specific elements, text, or custom timeouts
+- **SPA Navigation:** Support for Single Page Applications with multi-step navigation
+- **Browser Support:** Chrome and Firefox with automatic driver management
+
+### React Multi-Tab Chat Interface
 - Create, switch, and close chat tabs
 - Independent conversation contexts per tab
 - Persistent chat history via PostgreSQL
 - Real-time message rendering with source references
+- Query type selection (General, Service Recommendation, Pricing, Terraform)
+- Quick response modal for one-off questions
+- Responsive design with mobile support
+
+### Enhanced Document Ingestion
+- **Auto-close on Success**: Ingestion page automatically closes after successful processing
+- **Multiple Source Addition**: Add multiple URLs, repos, or files per submission
+- **Comprehensive Error Handling**: Clear error messages and validation
+- **Real-time Processing Updates**: Live progress feedback during ingestion
+- **Source Validation**: URL and repository format validation
+- **File Type Support**: PDF, CSV, and various document formats
 
 ### Performance Optimization
 - Redis caching for responses and embeddings
@@ -205,10 +244,21 @@ docker-compose up --build [service_name]
 ## 🔍 API Endpoints
 
 ### Backend (FastAPI)
-- `POST /chat/{tab_id}` - Send chat message to specific tab
-- `POST /sessions/{tab_id}/new` - Create new session for tab
-- `GET /sessions/{tab_id}/history` - Get chat history for tab
-- `GET /health` - Health check for all services
+- `POST /query/conversational` - Send conversational query with session context
+- `POST /query/one-time` - Send one-time query without session
+- `POST /sessions` - Create new session
+- `GET /sessions` - List all sessions
+- `DELETE /sessions/{session_id}` - Delete session
+- `GET /sessions/{session_id}/history` - Get session history
+- `PUT /sessions/{session_id}` - Update session name
+- `POST /generate-topic` - Generate topic from query
+- `GET /health` - Health check
+- `GET /stats` - Index statistics
+
+### Collab API
+- `POST /api/process` - Process document ingestion
+- `GET /api/status` - Check ingestion system status
+- `GET /health` - Health check
 
 ## 📝 Usage Examples
 

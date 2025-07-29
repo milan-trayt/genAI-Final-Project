@@ -1,1 +1,69 @@
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
 .env
+.env.*
+
+# VS Code settings
+.vscode/
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test & coverage
+coverage/
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.log
+
+# Build output
+build/
+dist/
+*.egg-info/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+develop-eggs/
+.installed.cfg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Misc
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*.rej
+
+# Local config
+*.local

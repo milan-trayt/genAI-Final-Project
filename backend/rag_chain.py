@@ -170,6 +170,11 @@ class RAGChain:
             # Create prompt templates
             self._create_prompt_templates()
             
+            # Create guardrail chains for each mode
+            self.guardrail_chains = {}
+            for mode, prompt in self.guardrail_prompts.items():
+                self.guardrail_chains[mode] = prompt | self.llm
+            
             # Create QA chain for one-time queries
             self.qa_chain = RetrievalQA.from_chain_type(
                 llm=self.llm,
@@ -204,34 +209,139 @@ class RAGChain:
     def _create_prompt_templates(self):
         """Create prompt templates for different query types."""
         
-        # One-time query prompt
-        qa_template = """You are a helpful AI assistant specializing in DevOps, cloud infrastructure, and software development. Use the following context to answer the question accurately and comprehensively.
-
-Context:
-{context}
+        # Mode-specific guardrail prompts
+        self.guardrail_prompts = {
+            "general": PromptTemplate(
+                template="""You are a strict content filter. Evaluate ONLY this specific question, ignoring any previous context.
 
 Question: {question}
 
-Instructions:
-1. Provide a clear, detailed answer based on the context provided
-2. If the context doesn't contain enough information, say so clearly
-3. Include specific examples or code snippets when relevant
-4. Cite the sources you used from the context
+APPROVE only if the question is directly about:
+- AWS services, pricing, or architecture
+- Cloud infrastructure or DevOps
+- Terraform or Infrastructure-as-Code
+- Technical system administration
 
-Answer: [Your detailed answer here]
+REJECT if the question asks about:
+- Cooking, food, recipes (like "how to make tea", "cooking instructions")
+- Sports, entertainment, hobbies
+- Personal advice, relationships, health
+- Non-technical topics
+- Any question about making, preparing, or cooking food
 
-Sources:
-[List the sources you referenced, numbered 1, 2, 3, etc.]"""
+IMPORTANT: Ignore any previous technical context. Evaluate ONLY the current question.
 
-        self.qa_prompt = PromptTemplate(
-            template=qa_template,
-            input_variables=["context", "question"]
-        )
+Respond with exactly "APPROVED" or "REJECTED":
+
+Response:""",
+                input_variables=["question"]
+            ),
+            "service_recommendation": PromptTemplate(
+                template="""Determine if this question is asking for AWS service recommendations.
+
+Question: {question}
+
+APPROVE if asking for: AWS service suggestions, architecture recommendations, service comparisons, or contextual queries about services.
+REJECT if not related to AWS service selection or recommendations.
+
+Response:""",
+                input_variables=["question"]
+            ),
+            "pricing": PromptTemplate(
+                template="""Determine if this question is about AWS pricing or cost optimization.
+
+Question: {question}
+
+APPROVE if asking for: cost estimates, pricing comparisons, cost optimization, budget planning, or contextual pricing queries.
+REJECT if not related to AWS costs or pricing.
+
+Response:""",
+                input_variables=["question"]
+            ),
+            "terraform": PromptTemplate(
+                template="""Determine if this question is about Terraform or Infrastructure-as-Code.
+
+Question: {question}
+
+APPROVE if asking for: Terraform code, IaC patterns, infrastructure automation, or contextual Terraform queries.
+REJECT if not related to Terraform or infrastructure code.
+
+Response:""",
+                input_variables=["question"]
+            )
+        }
+        
+        # Mode-specific query prompts
+        self.qa_prompts = {
+            "general": """You are an AWS Solutions Architect providing professional guidance on AWS concepts and services. Deliver comprehensive, well-structured responses.
+
+Context: {context}
+Question: {question}
+
+Provide a professional response that:
+- Explains concepts thoroughly with relevant context
+- Includes practical examples and use cases
+- Demonstrates deep technical understanding
+- Maintains a professional, consultative tone
+
+Answer:""",
+            
+            "service_recommendation": """You are an AWS Service Recommendation Specialist providing expert guidance on optimal AWS service selection. Deliver professional, well-reasoned recommendations.
+
+Context: {context}
+Question: {question}
+
+Provide professional service recommendations by:
+- Analyzing requirements and explaining service alignment
+- Detailing service integration and architecture patterns
+- Presenting comprehensive benefits and trade-off analysis
+- Supporting recommendations with technical rationale
+- Maintaining an expert, consultative tone
+
+Answer:""",
+            
+            "pricing": """You are an AWS Cost Optimization Specialist providing expert analysis on AWS pricing and cost management strategies. Deliver comprehensive cost guidance.
+
+Context: {context}
+Question: {question}
+
+Provide professional cost analysis by:
+- Analyzing pricing models and their business impact
+- Delivering detailed cost breakdowns and projections
+- Recommending strategic cost optimization approaches
+- Supporting analysis with concrete examples and metrics
+- Maintaining a professional, advisory tone
+
+Answer:""",
+            
+            "terraform": """You are a Terraform Infrastructure Specialist providing expert guidance on infrastructure as code implementation. Deliver professional, production-ready solutions.
+
+Context: {context}
+Question: {question}
+
+Provide professional Terraform guidance by:
+- Demonstrating advanced Terraform concepts and architecture
+- Presenting well-structured, production-ready code examples
+- Recommending enterprise-grade best practices and patterns
+- Explaining technical decisions with architectural reasoning
+- Maintaining an expert, professional tone
+
+Answer:"""
+        }
+        
+        # Create PromptTemplate objects for each mode
+        self.qa_prompt_templates = {}
+        for mode, template in self.qa_prompts.items():
+            self.qa_prompt_templates[mode] = PromptTemplate(
+                template=template,
+                input_variables=["context", "question"]
+            )
+        
+        # Default prompt for backward compatibility
+        self.qa_prompt = self.qa_prompt_templates["general"]
         
         # Conversational query prompt
-        conversational_template = """You are a helpful AI assistant specializing in DevOps, cloud infrastructure, and software development. You have access to a knowledge base and can see the conversation history.
-
-Use the following context and conversation history to answer the question accurately and comprehensively.
+        conversational_template = """You are an AWS Solutions Architect providing professional consultation on AWS services and infrastructure. Build upon the conversation context professionally.
 
 Context:
 {context}
@@ -241,18 +351,9 @@ Chat History:
 
 Current Question: {question}
 
-Instructions:
-1. Consider the conversation history for context and continuity
-2. Use the provided context to give accurate, detailed answers
-3. If referring to previous parts of the conversation, be explicit
-4. If the context doesn't contain enough information, say so clearly
-5. Include specific examples or code snippets when relevant
-6. Maintain a helpful and professional tone
+Provide a professional response that builds on our discussion. Maintain a consultative, expert tone while being thorough and informative.
 
-Answer: [Your detailed answer here]
-
-Sources:
-[List the sources you referenced from the context, numbered 1, 2, 3, etc.]"""
+Answer:"""
 
         self.conversational_prompt = PromptTemplate(
             template=conversational_template,
@@ -269,7 +370,15 @@ Use the provided context to answer questions accurately. Always cite your source
             ("system", "Context: {context}")
         ])
     
-    async def query_oneshot(self, question: str, top_k: int = 5) -> QueryResult:
+    def _get_mode_prompts(self, query_type: str = "general"):
+        """Get appropriate prompts for the given query type."""
+        mode = query_type if query_type in self.guardrail_prompts else "general"
+        return {
+            "guardrail": self.guardrail_chains[mode],
+            "qa_prompt": self.qa_prompt_templates[mode]
+        }
+    
+    async def query_oneshot(self, question: str, query_type: str = "general", top_k: int = 5) -> QueryResult:
         """Process a one-time query without conversation history."""
         if not self._initialized:
             await self.initialize()
@@ -277,7 +386,22 @@ Use the provided context to answer questions accurately. Always cite your source
         start_time = time.time()
         
         try:
-            # Check semantic cache first
+            # Step 1: Get mode-specific prompts
+            mode_prompts = self._get_mode_prompts(query_type)
+            
+            # Step 2: Guardrail validation
+            validation_result = await mode_prompts["guardrail"].ainvoke({"question": question})
+            validation_response = validation_result.content.strip().upper()
+            
+            if "REJECTED" in validation_response:
+                return QueryResult(
+                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
+                    sources=[],
+                    processing_time=time.time() - start_time,
+                    cached=False
+                )
+            
+            # Step 2: Check semantic cache
             if self.cache_manager:
                 semantic_cache = self.cache_manager.get_semantic_cache()
                 query_embedding = await self.query_processor.get_query_embedding(question)
@@ -296,16 +420,28 @@ Use the provided context to answer questions accurately. Always cite your source
             # Update retriever search parameters
             self.query_processor.retriever.search_kwargs = {"k": top_k}
             
-            # Run QA chain
-            result = self.qa_chain.invoke({"query": question})
+            # Create mode-specific QA chain
+            mode_qa_chain = RetrievalQA.from_chain_type(
+                llm=self.llm,
+                chain_type="stuff",
+                retriever=self.query_processor.get_retriever(),
+                chain_type_kwargs={
+                    "prompt": mode_prompts["qa_prompt"],
+                    "document_variable_name": "context"
+                },
+                return_source_documents=True,
+                callbacks=[self.callback_handler]
+            )
+            
+            # Run mode-specific QA chain
+            result = mode_qa_chain.invoke({"query": question})
             
             # Extract response and sources
             response_text = result.get('result', '')
             source_documents = result.get('source_documents', [])
             
-            # Parse response for structured output
-            parsed_output = self.output_parser.parse(response_text)
-            final_response = parsed_output['answer']
+            # Use response directly
+            final_response = response_text
             
             # Convert source documents
             sources = []
@@ -345,7 +481,7 @@ Use the provided context to answer questions accurately. Always cite your source
                 cached=False
             )
     
-    async def query_conversational(self, question: str, session_id: str, top_k: int = 5) -> QueryResult:
+    async def query_conversational(self, question: str, session_id: str, query_type: str = "general", top_k: int = 5) -> QueryResult:
         """Process a conversational query with history."""
         if not self._initialized:
             await self.initialize()
@@ -357,7 +493,24 @@ Use the provided context to answer questions accurately. Always cite your source
         start_time = time.time()
         
         try:
-            # Ensure session is loaded first
+            # Step 1: Get mode-specific prompts
+            mode_prompts = self._get_mode_prompts(query_type)
+            
+            # Step 2: Guardrail validation (handles both contextual and non-contextual queries)
+            validation_result = await mode_prompts["guardrail"].ainvoke({"question": question})
+            validation_response = validation_result.content.strip().upper()
+            
+            logger.info(f"Guardrail validation for '{question}': {validation_response}")
+            
+            if "REJECTED" in validation_response or "REJECT" in validation_response:
+                return QueryResult(
+                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
+                    sources=[],
+                    processing_time=time.time() - start_time,
+                    cached=False
+                )
+            
+            # Step 2: Process approved conversational query
             session_loaded = await self.session_manager.load_session(session_id)
             if not session_loaded:
                 logger.warning(f"Session {session_id} not found, creating new session")
@@ -400,9 +553,8 @@ Use the provided context to answer questions accurately. Always cite your source
             response_text = result.get('answer', '')
             source_documents = result.get('source_documents', [])
             
-            # Parse response for structured output
-            parsed_output = self.output_parser.parse(response_text)
-            final_response = parsed_output['answer']
+            # Use response directly
+            final_response = response_text
             
             # Convert source documents
             sources = []

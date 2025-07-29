@@ -15,6 +15,8 @@ from query_processor import QueryProcessor, get_query_processor
 from rag_chain import RAGChain, get_rag_chain
 from cache_manager import CacheManager, get_cache_manager
 from error_handler import ErrorHandler, get_error_handler
+from aws_service_recommender import AWSServiceRecommender
+from semantic_chunker import SemanticDocumentChunker
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,8 @@ class RAGService:
         self.query_processor: Optional[QueryProcessor] = None
         self.rag_chain: Optional[RAGChain] = None
         self.cache_manager: Optional[CacheManager] = None
+        self.aws_recommender: Optional[AWSServiceRecommender] = None
+        self.semantic_chunker = SemanticDocumentChunker()
         
         self._initialized = False
     
@@ -58,6 +62,12 @@ class RAGService:
                 self.cache_manager
             )
             
+            # Initialize AWS recommender
+            self.aws_recommender = AWSServiceRecommender(
+                llm=self.rag_chain.llm,
+                retriever=self.query_processor.get_retriever()
+            )
+            
             self._initialized = True
             logger.info("✅ RAG Service initialized successfully")
             return True
@@ -66,53 +76,196 @@ class RAGService:
             logger.error(f"Failed to initialize RAG service: {e}")
             return False
     
-    async def process_one_time_query(self, query: str, top_k: int = 5) -> Dict[str, Any]:
+    async def process_one_time_query(self, query: str, query_type: str = "general", top_k: int = 5) -> Dict[str, Any]:
         """Process a one-time query without conversation history."""
         if not self._initialized:
             await self.initialize()
         
         try:
-            result = await self.rag_chain.query_oneshot(query, top_k)
+
+            
+            if not self.rag_chain:
+                await self.initialize()
+            result = await self.rag_chain.query_oneshot(query, query_type, top_k)
             
             return {
                 "response": result.response,
                 "processing_time": result.processing_time,
                 "cached": result.cached,
-                "timestamp": datetime.utcnow()
+                "timestamp": datetime.utcnow().isoformat()
             }
             
         except Exception as e:
             logger.error(f"One-time query failed: {e}")
-            return {
-                "response": f"I apologize, but I encountered an error processing your query: {str(e)}",
-                "processing_time": 0.0,
-                "cached": False,
-                "timestamp": datetime.utcnow()
-            }
+            raise
     
-    async def process_conversational_query(self, query: str, session_id: str, top_k: int = 5) -> Dict[str, Any]:
+    async def process_conversational_query(self, query: str, session_id: str, query_type: str = "general", filters: Optional[Dict] = None, top_k: int = 5) -> Dict[str, Any]:
         """Process a conversational query with session context."""
         if not self._initialized:
             await self.initialize()
         
         try:
-            result = await self.rag_chain.query_conversational(query, session_id, top_k)
+            # Route query based on type
+            if query_type == "service_recommendation":
+                result = await self._handle_service_recommendation(query, session_id, filters)
+            elif query_type == "pricing":
+                result = await self._handle_pricing_query(query, session_id)
+            elif query_type == "terraform":
+                result = await self._handle_terraform_query(query, session_id)
+            else:
+
+                
+                if not self.rag_chain:
+                    await self.initialize()
+                result = await self.rag_chain.query_conversational(query, session_id, query_type, top_k)
+                result = {
+                    "response": result.response,
+                    "processing_time": result.processing_time,
+                    "cached": result.cached,
+                    "query_type": "general",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
             
-            return {
-                "response": result.response,
-                "processing_time": result.processing_time,
-                "cached": result.cached,
-                "timestamp": datetime.utcnow()
-            }
+            return result
             
         except Exception as e:
             logger.error(f"Conversational query failed: {e}")
+            raise
+    
+    async def _handle_service_recommendation(self, query: str, session_id: str, filters: Optional[Dict] = None) -> Dict[str, Any]:
+        """Handle service recommendation queries with CoT reasoning"""
+        recommendation = self.aws_recommender.recommend_services(query, filters)
+        
+        if "error" in recommendation:
             return {
-                "response": f"I apologize, but I encountered an error processing your query: {str(e)}",
-                "processing_time": 0.0,
-                "cached": False,
-                "timestamp": datetime.utcnow()
+                "response": recommendation["error"],
+                "query_type": "service_recommendation",
+                "timestamp": datetime.utcnow().isoformat()
             }
+        
+        # Format response with CoT reasoning
+        response = f"""## AWS Service Recommendation
+
+### Analysis
+{recommendation.get('analysis', '')}
+
+### Recommended Services
+"""
+        
+        for service in recommendation.get('recommended_services', []):
+            response += f"\n**{service.get('service')}**\n- Purpose: {service.get('purpose')}\n- Reasoning: {service.get('reasoning')}\n"
+        
+        response += f"\n### Architecture Overview\n{recommendation.get('architecture_overview', '')}"
+        
+        if recommendation.get('cost_factors'):
+            response += f"\n\n### Cost Considerations\n" + "\n".join([f"- {factor}" for factor in recommendation['cost_factors']])
+        
+        return {
+            "response": response,
+            "processing_time": 0.5,
+            "cached": False,
+            "recommendation": recommendation,
+            "query_type": "service_recommendation",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    async def _handle_pricing_query(self, query: str, session_id: str) -> Dict[str, Any]:
+        """Handle pricing estimation queries"""
+        services = self._extract_services_from_query(query)
+        usage_params = self._extract_usage_params(query)
+        
+        pricing = self.aws_recommender.get_pricing_estimate(services, usage_params)
+        
+        response = "## AWS Pricing Estimate\n\n"
+        for service, details in pricing.items():
+            if service != "error":
+                response += f"**{service}:**\n"
+                response += f"- Pricing Model: {details.get('pricing_model', 'N/A')}\n"
+                response += f"- Estimated Monthly Cost: {details.get('estimated_monthly_cost', 'N/A')}\n"
+                if details.get('optimization_tips'):
+                    response += f"- Optimization Tips: {', '.join(details['optimization_tips'])}\n\n"
+        
+        return {
+            "response": response,
+            "processing_time": 0.5,
+            "cached": False,
+            "pricing": pricing,
+            "query_type": "pricing",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    async def _handle_terraform_query(self, query: str, session_id: str) -> Dict[str, Any]:
+        """Handle Terraform code generation queries"""
+        services = self._extract_services_from_query(query)
+        requirements = self._extract_requirements_from_query(query)
+        
+        terraform_code = self.aws_recommender.generate_terraform_code(services, requirements)
+        
+        response = f"## Terraform Configuration\n\n```hcl\n{terraform_code}\n```"
+        
+        return {
+            "response": response,
+            "processing_time": 0.5,
+            "cached": False,
+            "terraform_code": terraform_code,
+            "query_type": "terraform",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    def _extract_services_from_query(self, query: str) -> List[str]:
+        """Extract AWS services mentioned in query"""
+        services = []
+        query_lower = query.lower()
+        
+        aws_services = {
+            'compute': ['EC2', 'Lambda', 'ECS', 'EKS', 'Fargate'],
+            'storage': ['S3', 'EBS', 'EFS', 'FSx'],
+            'database': ['RDS', 'DynamoDB', 'ElastiCache', 'DocumentDB'],
+            'networking': ['VPC', 'CloudFront', 'Route53', 'ELB', 'API Gateway'],
+            'security': ['IAM', 'KMS', 'Secrets Manager', 'WAF'],
+            'monitoring': ['CloudWatch', 'X-Ray', 'CloudTrail']
+        }
+        
+        for category, service_list in aws_services.items():
+            for service in service_list:
+                if service.lower() in query_lower:
+                    services.append(service)
+        
+        return services
+    
+    def _extract_usage_params(self, query: str) -> Dict[str, Any]:
+        """Extract usage parameters from query"""
+        import re
+        params = {}
+        
+        # Extract numbers that might be usage metrics
+        numbers = re.findall(r'\d+', query)
+        if numbers:
+            params['estimated_usage'] = numbers[0]
+        
+        # Extract environment indicators
+        query_lower = query.lower()
+        if 'production' in query_lower:
+            params['environment'] = 'production'
+        elif 'development' in query_lower or 'dev' in query_lower:
+            params['environment'] = 'development'
+        
+        return params
+    
+    def _extract_requirements_from_query(self, query: str) -> Dict[str, Any]:
+        """Extract requirements from query"""
+        requirements = {}
+        
+        query_lower = query.lower()
+        if 'production' in query_lower:
+            requirements['environment'] = 'production'
+        elif 'development' in query_lower or 'dev' in query_lower:
+            requirements['environment'] = 'development'
+        
+        if 'high availability' in query_lower or 'ha' in query_lower:
+            requirements['high_availability'] = True
+        
+        return requirements
     
     async def generate_topic_from_query(self, query: str) -> str:
         """Generate a short topic description from the first query."""
@@ -159,7 +312,7 @@ class RAGService:
             return {
                 "session_id": session_id,
                 "session_name": session_name,
-                "created_at": datetime.utcnow()
+                "created_at": datetime.utcnow().isoformat()
             }
             
         except Exception as e:
@@ -257,7 +410,7 @@ class RAGService:
             return {
                 "status": "unhealthy",
                 "components": {"service": {"status": "not_initialized"}},
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.utcnow().isoformat(),
                 "version": "1.0.0"
             }
         
@@ -286,7 +439,7 @@ class RAGService:
             return {
                 "status": overall_status,
                 "components": components,
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.utcnow().isoformat(),
                 "version": "1.0.0"
             }
             
@@ -295,7 +448,7 @@ class RAGService:
             return {
                 "status": "unhealthy",
                 "components": {"error": str(e)},
-                "timestamp": datetime.utcnow(),
+                "timestamp": datetime.utcnow().isoformat(),
                 "version": "1.0.0"
             }
     
@@ -310,7 +463,7 @@ class RAGService:
                 "total_vectors": stats.get("total_vectors", 0),
                 "dimension": stats.get("dimension", 1536),
                 "index_fullness": stats.get("index_fullness", 0.0),
-                "timestamp": datetime.utcnow()
+                "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
             logger.error(f"Index stats failed: {e}")
@@ -318,7 +471,7 @@ class RAGService:
                 "total_vectors": 0,
                 "dimension": 1536,
                 "index_fullness": 0.0,
-                "timestamp": datetime.utcnow()
+                "timestamp": datetime.utcnow().isoformat()
             }
     
     async def close(self):

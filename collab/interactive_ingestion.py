@@ -8,6 +8,8 @@ import os
 import httpx
 import openai
 import uuid
+import requests
+import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -20,6 +22,7 @@ from models import (
     create_github_codebase_source, create_csv_source
 )
 from config import get_config
+from websocket_server import send_processing_update
 
 class WorkingOpenAIEmbeddings:
     """Custom OpenAI embeddings wrapper that bypasses LangChain's client issues"""
@@ -154,59 +157,101 @@ class InteractiveRAGIngestion:
             print("❌ Failed to initialize. Please check your configuration.")
             exit(1)
     
-    def process_documents(self):
+    def process_documents(self, session_id: str = "default"):
         """Process all added document sources."""
         if not self.document_sources:
-            print("\n❌ No document sources added. Please add sources first.")
+            msg = "No document sources added. Please add sources first."
+            print(f"\n❌ {msg}")
+            send_processing_update(session_id, "error", msg)
             return
         
-        print(f"\n🔄 Processing {len(self.document_sources)} document sources...")
+        start_time = time.time()  # Track processing start time
+        msg = f"Processing {len(self.document_sources)} document sources..."
+        print(f"\n🔄 {msg}")
+        send_processing_update(session_id, "start", msg, {"total_sources": len(self.document_sources)})
         
         try:
             from langchain.text_splitter import RecursiveCharacterTextSplitter
             from langchain.schema import Document
             
+            # Optimize chunk size based on source type
+            if any(s.source_type == 'csv' for s in self.document_sources):
+                chunk_size = 1500
+                chunk_overlap = 50
+            elif any(s.source_type == 'github_codebase' for s in self.document_sources):
+                chunk_size = 800
+                chunk_overlap = 100
+            else:
+                chunk_size = self.ingestion_config.chunk_size
+                chunk_overlap = self.ingestion_config.chunk_overlap
+            
             text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=self.ingestion_config.chunk_size,
-                chunk_overlap=self.ingestion_config.chunk_overlap
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap
             )
             
             all_documents = []
+            sources_to_remove = []
             
             # Load documents from all sources
-            for source in self.document_sources:
+            for i, source in enumerate(self.document_sources):
                 try:
-                    print(f"\n📄 Processing: {source.source_type} - {source.source_path}")
+                    msg = f"Processing: {source.source_type} - {source.source_path}"
+                    print(f"\n📄 {msg}")
+                    send_processing_update(session_id, "source_processing", msg, {
+                        "source_index": i + 1,
+                        "total_sources": len(self.document_sources),
+                        "source_type": source.source_type,
+                        "source_path": source.source_path
+                    })
+                    
                     docs = self._load_documents_from_source(source)
                     if docs:
                         all_documents.extend(docs)
-                        print(f"✅ Loaded {len(docs)} documents")
+                        sources_to_remove.append(source)
+                        msg = f"Loaded {len(docs)} documents"
+                        print(f"✅ {msg}")
+                        send_processing_update(session_id, "source_complete", msg, {"documents_loaded": len(docs)})
                     else:
-                        print("⚠️ No documents loaded from this source")
+                        msg = "No documents loaded from this source"
+                        print(f"⚠️ {msg}")
+                        send_processing_update(session_id, "warning", msg)
                 except Exception as e:
-                    print(f"❌ Error loading from {source.source_path}: {e}")
+                    msg = f"Error loading from {source.source_path}: {e}"
+                    print(f"❌ {msg}")
+                    send_processing_update(session_id, "error", msg)
                     continue
             
             if not all_documents:
-                print("\n❌ No documents loaded from any source")
+                msg = "No documents loaded from any source"
+                print(f"\n❌ {msg}")
+                send_processing_update(session_id, "error", msg)
                 return
             
-            print(f"\n📝 Splitting {len(all_documents)} documents into chunks...")
+            msg = f"Splitting {len(all_documents)} documents into chunks..."
+            print(f"\n📝 {msg}")
+            send_processing_update(session_id, "chunking", msg, {"total_documents": len(all_documents)})
             
-            # Split documents into chunks
             texts = text_splitter.split_documents(all_documents)
-            print(f"✅ Created {len(texts)} text chunks")
+            msg = f"Created {len(texts)} text chunks"
+            print(f"✅ {msg}")
+            send_processing_update(session_id, "chunking_complete", msg, {"total_chunks": len(texts)})
             
-            # Create embeddings and store in Pinecone
-            print(f"\n🔗 Creating embeddings and storing in Pinecone...")
+            msg = "Creating embeddings and storing in Pinecone..."
+            print(f"\n🔗 {msg}")
+            send_processing_update(session_id, "embedding_start", msg)
+            
+            text_contents = [doc.page_content for doc in texts]
+            
+            msg = f"Creating embeddings for {len(text_contents)} chunks..."
+            print(f"  {msg}")
+            send_processing_update(session_id, "embedding_progress", msg, {"total_chunks": len(text_contents)})
+            
+            embeddings = self.embeddings.embed_documents(text_contents)
             
             vectors_to_upsert = []
-            for i, doc in enumerate(texts):
+            for i, (doc, embedding) in enumerate(zip(texts, embeddings)):
                 try:
-                    # Create embedding
-                    embedding = self.embeddings.embed_query(doc.page_content)
-                    
-                    # Filter metadata
                     filtered_metadata = self._filter_metadata(doc.metadata)
                     filtered_metadata['text'] = doc.page_content
                     
@@ -216,35 +261,69 @@ class InteractiveRAGIngestion:
                         'metadata': filtered_metadata
                     })
                     
-                    if (i + 1) % 10 == 0:
-                        print(f"  Processed {i + 1}/{len(texts)} chunks")
+                    if (i + 1) % 100 == 0:
+                        msg = f"Processed {i + 1}/{len(texts)} chunks"
+                        print(f"  {msg}")
+                        send_processing_update(session_id, "embedding_progress", msg, {
+                            "processed": i + 1,
+                            "total": len(texts)
+                        })
                         
                 except Exception as e:
                     print(f"❌ Error processing chunk {i}: {e}")
                     continue
             
             if vectors_to_upsert:
-                # Upsert to Pinecone in batches
                 batch_size = self.ingestion_config.batch_size
+                total_batches = (len(vectors_to_upsert) + batch_size - 1) // batch_size
+                
                 for i in range(0, len(vectors_to_upsert), batch_size):
                     batch = vectors_to_upsert[i:i + batch_size]
                     self.index.upsert(vectors=batch)
-                    print(f"  Uploaded batch {i//batch_size + 1}/{(len(vectors_to_upsert) + batch_size - 1)//batch_size}")
+                    batch_num = i // batch_size + 1
+                    msg = f"Uploaded batch {batch_num}/{total_batches}"
+                    print(f"  {msg}")
+                    send_processing_update(session_id, "upload_progress", msg, {
+                        "batch": batch_num,
+                        "total_batches": total_batches
+                    })
                 
-                print(f"\n✅ Successfully processed and stored {len(vectors_to_upsert)} document chunks!")
+                msg = f"Successfully processed and stored {len(vectors_to_upsert)} document chunks!"
+                print(f"\n✅ {msg}")
                 
-                # Update stats
                 self.processing_stats.documents_loaded = len(all_documents)
                 self.processing_stats.chunks_created = len(texts)
                 self.processing_stats.embeddings_created = len(vectors_to_upsert)
                 
+                send_processing_update(session_id, "complete", msg, {
+                    "status": "success",
+                    "stats": {
+                        "total_sources": len(sources_to_remove),
+                        "documents_loaded": self.processing_stats.documents_loaded,
+                        "chunks_created": self.processing_stats.chunks_created,
+                        "embeddings_created": self.processing_stats.embeddings_created,
+                        "processing_time": time.time() - start_time if 'start_time' in locals() else 0
+                    }
+                })
+                
+                # Remove successfully processed sources
+                for source in sources_to_remove:
+                    if source in self.document_sources:
+                        self.document_sources.remove(source)
+                if sources_to_remove:
+                    print(f"✅ Removed {len(sources_to_remove)} successfully processed sources")
+                
                 self.display_processing_stats()
                 self.display_index_stats()
             else:
-                print("\n❌ No valid chunks created for storage")
+                msg = "No valid chunks created for storage"
+                print(f"\n❌ {msg}")
+                send_processing_update(session_id, "error", msg)
                 
         except Exception as e:
-            print(f"\n❌ Error during processing: {e}")
+            msg = f"Error during processing: {e}"
+            print(f"\n❌ {msg}")
+            send_processing_update(session_id, "error", msg)
             import traceback
             traceback.print_exc()
     
@@ -294,10 +373,79 @@ class InteractiveRAGIngestion:
         return loader.load()
     
     def _load_web_documents(self, source: DocumentSource) -> List:
-        """Load web documents"""
-        from langchain_community.document_loaders import WebBaseLoader
-        loader = WebBaseLoader(source.source_path)
-        return loader.load()
+        """Load web documents with JavaScript support"""
+        try:
+            # Try enhanced Selenium loader first for JavaScript-heavy sites
+            from selenium_web_loader import EnhancedSeleniumWebLoader, CompatibleSeleniumLoader
+            
+            metadata = source.metadata or {}
+            use_selenium = metadata.get('use_selenium', True)
+            wait_for_element = metadata.get('wait_for_element')
+            wait_for_text = metadata.get('wait_for_text')
+            additional_wait = metadata.get('additional_wait', 3)
+            browser = metadata.get('browser', 'chrome')
+            
+            if use_selenium:
+                print(f"  Using Selenium loader for JavaScript-heavy content...")
+                
+                # Use the compatible wrapper for single URLs
+                if isinstance(source.source_path, str):
+                    urls = [source.source_path]
+                else:
+                    urls = source.source_path
+                
+                # Try enhanced loader first
+                try:
+                    loader = EnhancedSeleniumWebLoader(
+                        browser=browser,
+                        headless=True,
+                        wait_time=15
+                    )
+                    
+                    if len(urls) == 1:
+                        doc = loader.load_url_with_js_wait(
+                            url=urls[0],
+                            wait_for_element=wait_for_element,
+                            wait_for_text=wait_for_text,
+                            additional_wait=additional_wait
+                        )
+                        return [doc] if doc.page_content else []
+                    else:
+                        return loader.load_urls(urls)
+                        
+                except Exception as selenium_error:
+                    print(f"  Enhanced Selenium loader failed: {selenium_error}")
+                    print(f"  Trying compatible Selenium loader...")
+                    
+                    # Fallback to compatible loader
+                    try:
+                        compatible_loader = CompatibleSeleniumLoader(
+                            urls=urls,
+                            browser=browser,
+                            headless=True,
+                            wait_time=15
+                        )
+                        return compatible_loader.load()
+                    except Exception as compatible_error:
+                        print(f"  Compatible Selenium loader failed: {compatible_error}")
+                        print(f"  Falling back to basic WebBaseLoader...")
+            
+            # Fallback to basic web loader
+            from langchain_community.document_loaders import WebBaseLoader
+            print(f"  Using basic WebBaseLoader...")
+            loader = WebBaseLoader(source.source_path)
+            return loader.load()
+            
+        except Exception as e:
+            print(f"  Error in web document loading: {e}")
+            # Final fallback
+            try:
+                from langchain_community.document_loaders import WebBaseLoader
+                loader = WebBaseLoader(source.source_path)
+                return loader.load()
+            except Exception as final_error:
+                print(f"  Final fallback failed: {final_error}")
+                return []
     
     def _load_github_documents(self, source: DocumentSource) -> List:
         """Load GitHub issues and PRs"""
@@ -311,66 +459,43 @@ class InteractiveRAGIngestion:
         return loader.load()
     
     def _load_github_codebase_documents(self, source: DocumentSource) -> List:
-        """Load GitHub codebase files"""
-        from langchain.schema import Document
-        from github import Github
+        """Load GitHub codebase files using GithubFileLoader"""
+        from langchain_community.document_loaders import GithubFileLoader
         
         metadata = source.metadata or {}
         access_token = metadata.get('access_token')
-        file_extensions = metadata.get('file_extensions', [
-            '.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.hpp',
-            '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.scala',
-            '.md', '.rst', '.txt', '.yml', '.yaml', '.json', '.xml',
-            '.tf', '.sh', '.bat', '.ps1', '.sql', '.html', '.css',
-            '.scss', '.less', '.vue', '.svelte', '.jsx', '.tsx', '.ts',
-            '.tsx', '.jsx', '.svelte', '.vue', '.svelte', '.vue', '.svelte',
-            '.hcp', '.hcl', '.tfvars', '.tfstate', '.tfstate.backup', '.tf',
-            '.tf.json', '.tfvars.json', '.tfstate.json', '.tfstate.backup.json',
-            '.tf.json', '.tfvars.json', '.tfstate.json', '.tfstate.backup.json',
-            '.tf', '.tf.json', '.tfvars.json', '.tfstate.json', '.tfstate.backup.json'
-        ])
-        max_file_size = metadata.get('max_file_size', 1024 * 1024)
+        file_extensions = metadata.get('file_extensions', ['.py', '.js', '.ts', '.md', '.tf', '.yml', '.yaml'])
         
-        g = Github(access_token) if access_token else Github()
-        repository = g.get_repo(source.source_path)
-        
-        documents = []
-        
-        def process_contents(contents, path=""):
-            for content in contents:
-                try:
-                    if content.type == "dir":
-                        subcontents = repository.get_contents(content.path)
-                        process_contents(subcontents, content.path)
-                    elif content.type == "file":
-                        file_ext = os.path.splitext(content.name)[1].lower()
-                        if file_ext in file_extensions and content.size <= max_file_size:
-                            try:
-                                file_content = content.decoded_content.decode('utf-8')
-                                doc = Document(
-                                    page_content=file_content,
-                                    metadata={
-                                        'source_type': 'github_codebase',
-                                        'source_path': source.source_path,
-                                        'file_path': content.path,
-                                        'file_name': content.name,
-                                        'file_extension': file_ext,
-                                        'file_size': content.size,
-                                        'repository_url': repository.html_url,
-                                        'file_url': content.html_url
-                                    }
-                                )
-                                documents.append(doc)
-                            except UnicodeDecodeError:
-                                continue
-                except Exception as e:
-                    print(f"⚠️ Error processing {content.path}: {e}")
-                    continue
-        
-        root_contents = repository.get_contents("")
-        process_contents(root_contents)
-        
-        return documents
+        # Try main branch first
+        try:
+            loader = GithubFileLoader(
+                repo=source.source_path,
+                branch="main",
+                access_token=access_token,
+                github_api_url="https://api.github.com",
+                file_filter=lambda file_path: any(file_path.endswith(ext) for ext in file_extensions)
+            )
+            documents = loader.load()
+            print(f"✅ Loaded {len(documents)} files from GitHub repository (main branch)")
+            return documents
+        except Exception:
+            # Try master branch if main fails
+            try:
+                loader = GithubFileLoader(
+                    repo=source.source_path,
+                    branch="master",
+                    access_token=access_token,
+                    github_api_url="https://api.github.com",
+                    file_filter=lambda file_path: any(file_path.endswith(ext) for ext in file_extensions)
+                )
+                documents = loader.load()
+                print(f"✅ Loaded {len(documents)} files from GitHub repository (master branch)")
+                return documents
+            except Exception as e:
+                print(f"❌ Error loading GitHub repository: {e}")
+                raise e
+    
+
     
     def _load_confluence_documents(self, source: DocumentSource) -> List:
         """Load Confluence documents"""
@@ -387,10 +512,44 @@ class InteractiveRAGIngestion:
         return loader.load()
     
     def _load_csv_documents(self, source: DocumentSource) -> List:
-        """Load CSV documents"""
-        from langchain_community.document_loaders import CSVLoader
-        loader = CSVLoader(file_path=source.source_path)
-        return loader.load()
+        """Load large CSV documents in chunks"""
+        import pandas as pd
+        from langchain.schema import Document
+        
+        documents = []
+        chunk_size = 1000  # Process 1000 rows at a time
+        
+        try:
+            # Read CSV in chunks to handle large files
+            for chunk_num, chunk_df in enumerate(pd.read_csv(source.source_path, chunksize=chunk_size)):
+                # Convert chunk to string representation
+                chunk_content = chunk_df.to_string(index=False)
+                
+                doc = Document(
+                    page_content=chunk_content,
+                    metadata={
+                        'source_type': 'csv',
+                        'source_path': source.source_path,
+                        'chunk_number': chunk_num,
+                        'rows_count': len(chunk_df),
+                        'columns': list(chunk_df.columns)
+                    }
+                )
+                documents.append(doc)
+                
+                # Progress feedback
+                if (chunk_num + 1) % 10 == 0:
+                    print(f"  Processed {(chunk_num + 1) * chunk_size} rows...")
+                    
+        except Exception as e:
+            print(f"Error processing CSV: {e}")
+            # Fallback to original loader for smaller files
+            from langchain_community.document_loaders import CSVLoader
+            loader = CSVLoader(file_path=source.source_path)
+            return loader.load()
+        
+        print(f"✅ Processed {len(documents)} chunks from CSV file")
+        return documents
     
     def test_search(self):
         """Test search functionality."""
@@ -706,12 +865,57 @@ Answer:"""
 
 def main():
     """Main execution function."""
-    try:
-        ingestion = InteractiveRAGIngestion()
-        ingestion.run()
-    except Exception as e:
-        print(f"\n❌ Fatal error: {e}")
-        exit(1)
+    import sys
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Process documents for RAG ingestion')
+    parser.add_argument('--input', type=str, help='JSON input with sources and config')
+    args = parser.parse_args()
+    
+    if args.input:
+        import json
+        try:
+            input_data = json.loads(args.input)
+            ingestion = InteractiveRAGIngestion()
+            
+            # Process each source
+            for source in input_data.get('sources', []):
+                source_type = source.get('type')
+                
+                if source_type == 'web':
+                    web_source = create_web_source(source.get('path'), source.get('docType', 'web_document'))
+                    ingestion.document_sources.append(web_source)
+                elif source_type == 'github':
+                    github_source = create_github_codebase_source(
+                        source.get('path'), 
+                        source.get('token'), 
+                        source.get('extensions', []),
+                        source.get('maxSize', 1024*1024)
+                    )
+                    ingestion.document_sources.append(github_source)
+                elif source_type == 'pdf':
+                    pdf_source = create_pdf_source(source.get('path'), source.get('docType', 'pdf_document'))
+                    ingestion.document_sources.append(pdf_source)
+                elif source_type == 'csv':
+                    csv_source = create_csv_source(source.get('path'), source.get('docType', 'csv_document'))
+                    ingestion.document_sources.append(csv_source)
+
+            
+            # Process documents
+            ingestion.process_documents()
+            print("SUCCESS: Documents processed successfully")
+            
+        except Exception as e:
+            print(f"ERROR: {str(e)}")
+            sys.exit(1)
+    else:
+        # Interactive mode
+        try:
+            ingestion = InteractiveRAGIngestion()
+            ingestion.run()
+        except Exception as e:
+            print(f"\n❌ Fatal error: {e}")
+            exit(1)
 
 if __name__ == "__main__":
     main()

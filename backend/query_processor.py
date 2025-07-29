@@ -111,10 +111,12 @@ class WorkingOpenAIEmbeddings(OpenAIEmbeddings):
         # Create explicit httpx client to avoid proxies issue
         http_client = httpx.Client()
         
-        # Create OpenAI client with explicit http_client
+        # Create OpenAI client with explicit http_client and timeout
         self.client = openai.OpenAI(
             api_key=config.openai.api_key,
-            http_client=http_client
+            http_client=http_client,
+            timeout=30.0,
+            max_retries=2
         )
     
     def embed_query(self, text: str) -> List[float]:
@@ -243,23 +245,38 @@ class QueryProcessor:
                 cache_manager=self.cache_manager
             )
             
-            # Test embeddings
-            test_embedding = self.embeddings.embed_query("test")
-            logger.info(f"✅ OpenAI embeddings working (dimension: {len(test_embedding)})")
+            # Skip test embedding to avoid initialization timeout
+            logger.info("✅ OpenAI embeddings initialized (test skipped)")
             
-            # Initialize Pinecone
+            # Initialize Pinecone with retry logic
             from pinecone import Pinecone
-            pc = Pinecone(api_key=self.config.pinecone.api_key)
+            import time
             
-            # Get existing index
-            index_name = self.config.pinecone.index_name
-            existing_indexes = [index.name for index in pc.list_indexes()]
-            
-            if index_name not in existing_indexes:
-                raise ValueError(f"Pinecone index '{index_name}' not found. Please run interactive_ingestion.py first to create and populate the index.")
-            
-            self.pinecone_index = pc.Index(index_name)
-            logger.info("✅ Connected to existing Pinecone index")
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    pc = Pinecone(
+                        api_key=self.config.pinecone.api_key,
+                        timeout=15
+                    )
+                    
+                    # Get existing index with timeout
+                    index_name = self.config.pinecone.index_name
+                    existing_indexes = [index.name for index in pc.list_indexes()]
+                    
+                    if index_name not in existing_indexes:
+                        raise ValueError(f"Pinecone index '{index_name}' not found. Please run interactive_ingestion.py first to create and populate the index.")
+                    
+                    self.pinecone_index = pc.Index(index_name)
+                    logger.info("✅ Connected to existing Pinecone index")
+                    break
+                    
+                except Exception as e:
+                    logger.warning(f"Pinecone connection attempt {attempt + 1}/{max_retries} failed: {e}")
+                    if attempt == max_retries - 1:
+                        logger.error("Failed to connect to Pinecone after all retries")
+                        raise
+                    time.sleep(5)  # Wait before retry
             
             # Create LangChain Pinecone vectorstore
             from langchain_pinecone import PineconeVectorStore

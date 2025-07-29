@@ -16,6 +16,7 @@ class QueryType(str, Enum):
 class OneTimeQueryRequest(BaseModel):
     """Request model for one-time queries."""
     query: str = Field(..., min_length=1, max_length=2000, description="The query text")
+    query_type: Optional[str] = Field(default="general", description="Query type: general, service_recommendation, pricing, terraform")
     top_k: Optional[int] = Field(default=5, ge=1, le=20, description="Number of documents to retrieve")
 
 
@@ -24,6 +25,8 @@ class ConversationalQueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000, description="The query text")
     session_id: str = Field(..., min_length=1, description="Session ID for conversation context")
     top_k: Optional[int] = Field(default=5, ge=1, le=20, description="Number of documents to retrieve")
+    query_type: Optional[str] = Field(default="general", description="Query type: general, service_recommendation, pricing, terraform")
+    filters: Optional[dict] = Field(default=None, description="Metadata filters for retrieval")
 
 
 class SessionCreateRequest(BaseModel):
@@ -38,6 +41,8 @@ class QueryResponse(BaseModel):
     processing_time: float = Field(..., description="Processing time in seconds")
     cached: bool = Field(default=False, description="Whether the response was cached")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Response timestamp")
+    query_type: Optional[str] = Field(default="general", description="Type of query processed")
+    metadata: Optional[dict] = Field(default=None, description="Additional response metadata")
 
 
 class SessionInfo(BaseModel):

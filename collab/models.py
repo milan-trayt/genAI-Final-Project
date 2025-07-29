@@ -171,12 +171,22 @@ def create_pdf_source(file_path: str, doc_type: str = "pdf_document") -> Documen
     )
 
 
-def create_web_source(url: str, doc_type: str = "web_document") -> DocumentSource:
-    """Create a web document source."""
+def create_web_source(url: str, doc_type: str = "web_document", 
+                     use_selenium: bool = True, wait_for_element: Optional[str] = None,
+                     wait_for_text: Optional[str] = None, additional_wait: int = 3,
+                     browser: str = "chrome") -> DocumentSource:
+    """Create a web document source with JavaScript support options."""
     return DocumentSource(
         source_type="web",
         source_path=url,
-        metadata={"doc_type": doc_type}
+        metadata={
+            "doc_type": doc_type,
+            "use_selenium": use_selenium,
+            "wait_for_element": wait_for_element,
+            "wait_for_text": wait_for_text,
+            "additional_wait": additional_wait,
+            "browser": browser
+        }
     )
 
 

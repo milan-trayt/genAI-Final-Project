@@ -16,7 +16,9 @@ from models import (
     QueryResponse, SessionCreateResponse, SessionListResponse, HealthResponse,
     ErrorResponse, IndexStatsResponse
 )
+from typing import Dict, Any, Optional
 from pydantic import BaseModel
+from typing import List
 
 class TopicGenerationRequest(BaseModel):
     query: str
@@ -68,9 +70,14 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://localhost:3001",
+        "http://frontend:3000",
+        "http://genai-frontend:3000"
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -82,11 +89,11 @@ async def global_exception_handler(request, exc):
     logger.error(f"Unhandled exception: {exc}")
     return JSONResponse(
         status_code=500,
-        content=ErrorResponse(
-            error="Internal server error",
-            detail=str(exc),
-            timestamp=datetime.utcnow()
-        ).dict()
+content={
+            "error": "Internal server error",
+            "detail": str(exc),
+            "timestamp": datetime.utcnow().isoformat()
+        }
     )
 
 
@@ -126,6 +133,7 @@ async def one_time_query(
         
         result = await rag_service.process_one_time_query(
             query=request.query,
+            query_type=getattr(request, 'query_type', 'general'),
             top_k=request.top_k
         )
         
@@ -149,10 +157,26 @@ async def conversational_query(
         result = await rag_service.process_conversational_query(
             query=request.query,
             session_id=request.session_id,
+            query_type=getattr(request, 'query_type', 'general'),
+            filters=None,
             top_k=request.top_k
         )
         
-        return QueryResponse(**result)
+        # Add query_type and metadata to response
+        response_data = {
+            "response": result["response"],
+            "processing_time": result["processing_time"],
+            "cached": result["cached"],
+            "timestamp": result["timestamp"],
+            "query_type": result.get("query_type", "general"),
+            "metadata": {
+                "recommendation": result.get("recommendation"),
+                "pricing": result.get("pricing"),
+                "terraform_code": result.get("terraform_code")
+            }
+        }
+        
+        return QueryResponse(**response_data)
         
     except Exception as e:
         logger.error(f"Conversational query failed: {e}")
@@ -252,8 +276,49 @@ async def get_session_history(
         raise HTTPException(status_code=500, detail=f"Getting session history failed: {str(e)}")
 
 
+@app.post("/ingest")
+async def ingest_documents(request: dict):
+    """Process document ingestion using collab scripts."""
+    try:
+        import subprocess
+        import json
+        
+        logger.info(f"Starting document ingestion: {request.get('sources', [])}")
+        
+        # Create input file for Python script
+        input_data = {
+            "sources": request.get("sources", []),
+            "config": request.get("config", {})
+        }
+        
+        # Call the Python ingestion script
+        # Make HTTP request to collab container
+        import httpx
+        
+        collab_response = httpx.post(
+            "http://collab:8503/api/ingest",
+            json=input_data,
+            timeout=300.0
+        )
+        
+        if collab_response.status_code == 200:
+            return {"status": "success", "message": "Documents processed successfully"}
+        else:
+            return {"status": "error", "message": f"Collab processing failed: {collab_response.text}"}
+        
+
+            
+    except Exception as e:
+        logger.error(f"Document ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Document ingestion failed: {str(e)}")
+
+
 class SessionUpdateRequest(BaseModel):
     session_name: str
+
+class IngestionRequest(BaseModel):
+    sources: list
+    config: dict = {}
 
 @app.put("/sessions/{session_id}")
 async def update_session(

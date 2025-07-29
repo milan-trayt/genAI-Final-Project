@@ -44,17 +44,16 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: genai-backend
-    ports:
-      - "8000:8000"
+    network_mode: host
     environment:
       - ENVIRONMENT=development
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
       - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
       - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
-      - REDIS_HOST=redis
+      - REDIS_HOST=localhost
       - REDIS_PORT=6379
-      - POSTGRES_HOST=postgres
+      - POSTGRES_HOST=localhost
       - POSTGRES_PORT=5432
       - POSTGRES_DB=genai_devops
       - POSTGRES_USER=postgres
@@ -66,36 +65,30 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - genai-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    restart: unless-stopped
 
-  # Frontend (Streamlit)
+  # Frontend (React)
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
+      context: ./react-frontend
+      dockerfile: Dockerfile.dev
     container_name: genai-frontend
     ports:
-      - "8501:8501"
+      - "3000:3000"
     environment:
-      - BACKEND_URL=http://backend:8000
+      - REACT_APP_BACKEND_URL=http://localhost:8000
+      - REACT_APP_COLLAB_URL=http://localhost:8503
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
     volumes:
-      - ./frontend:/app
+      - ./react-frontend:/app
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
+      - collab
     networks:
       - genai-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    stdin_open: true
+    tty: true
 
   # Collab (Jupyter for RAG Pipeline)
   collab:
@@ -105,16 +98,45 @@ services:
     container_name: genai-collab
     ports:
       - "8888:8888"
+      - "8503:8503"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - PINECONE_API_KEY=${PINECONE_API_KEY}
       - PINECONE_ENVIRONMENT=${PINECONE_ENVIRONMENT}
       - PINECONE_INDEX_NAME=${PINECONE_INDEX_NAME}
+      - USER_AGENT=GenAI-DevOps-Assistant/1.0
+      # Database connections for Docker networking
+      - REDIS_HOST=redis
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=genai_devops
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      # Selenium/Chrome configuration
+      - DISPLAY=:99
+      - CHROME_BIN=/usr/bin/google-chrome
+      - CHROME_PATH=/usr/bin/google-chrome
     volumes:
       - ./collab:/workspace
       - ./data:/workspace/data
+      # Shared memory for Chrome
+      - /dev/shm:/dev/shm
+    # Security options for Chrome in container
+    security_opt:
+      - seccomp:unconfined
+    # Additional capabilities for Chrome
+    cap_add:
+      - SYS_ADMIN
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - genai-network
+    restart: unless-stopped
+    command: >
+      sh -c "python api_server.py & jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password='' & wait"
 
 volumes:
   postgres_data:

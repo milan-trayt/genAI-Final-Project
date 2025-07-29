@@ -1,0 +1,19 @@
+{
+  "name": "genai",
+  "version": "1.0.0",
+  "description": "A restructured full-stack application designed to help DevOps and platform engineers design cost-effective AWS architectures through a conversational interface with clear separation of concerns.",
+  "main": "test_websocket.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "socket.io-client": "^4.8.1"
+  }
+}
