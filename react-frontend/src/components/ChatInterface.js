@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Send, Plus, X, Settings } from 'lucide-react';
 import QueryTypeSelector from './QueryTypeSelector';
 import '../QueryTypeSelector.css';
@@ -374,7 +375,7 @@ const ChatInterface = () => {
                         {message.query_type.replace('_', ' ').toUpperCase()}
                       </div>
                     )}
-                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                     {message.metadata?.terraform_code && (
                       <div className="terraform-code">
                         <h4>Generated Terraform Code:</h4>
@@ -460,7 +461,7 @@ const ChatInterface = () => {
                 <div className="quick-result">
                   <h4>Response:</h4>
                   <div className="result-content">
-                    <ReactMarkdown>{quickResult}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{quickResult}</ReactMarkdown>
                   </div>
                 </div>
               )}

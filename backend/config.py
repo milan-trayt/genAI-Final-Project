@@ -83,7 +83,7 @@ def get_config() -> Config:
         model=os.getenv("OPENAI_MODEL", "gpt-4.1-nano"),
         embedding_model=os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
         temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.1")),
-        max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
+        max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "4000"))
     )
     
     # Pinecone configuration

@@ -308,7 +308,7 @@ class QueryProcessor:
             self.retriever.search_kwargs = {"k": top_k}
             
             # Get relevant documents
-            documents = self.retriever.get_relevant_documents(query)
+            documents = self.retriever.invoke(query)
             
             # Convert to SourceDocument objects
             source_docs = []

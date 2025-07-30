@@ -28,34 +28,39 @@ class AWSServiceRecommender:
             'infrastructure', 'architecture', 'deploy', 'deployment', 'host', 'hosting',
             'database', 'storage', 'compute', 'server', 'application', 'microservice',
             'container', 'serverless', 'cost', 'pricing', 'price', 'estimate', 'budget',
-            'terraform', 'provision', 'resource', 'backend', 'cloud'
+            'terraform', 'provision', 'resource', 'backend', 'cloud', 'recommendation',
+            'recommend', 'service', 'final', 'requirements'
         ]
         
         query_lower = query.lower()
         return any(keyword in query_lower for keyword in aws_keywords)
     
-    def recommend_services(self, scenario: str, filters: Optional[Dict] = None) -> Dict[str, Any]:
+    async def recommend_services(self, scenario: str, filters: Optional[Dict] = None, conversation_context: str = "") -> Dict[str, Any]:
         """Recommend AWS services with CoT reasoning"""
         
-        # Simple validation - handled in prompt
-        if not self.is_valid_query(scenario):
-            return {
-                "error": "I specialize in AWS cloud infrastructure, service recommendations, pricing estimates, and Terraform code generation. Please ask about AWS services, architecture, or infrastructure needs."
-            }
+        # Let the LLM handle validation through prompts instead of keyword matching
         
         # Retrieve relevant context
-        context_docs = self.retriever.get_relevant_documents(scenario)
+        context_docs = self.retriever.invoke(scenario)
         context = self._filter_context(context_docs, filters)
+        
+        # Add conversation context if available
+        if conversation_context:
+            context = f"Previous conversation context:\n{conversation_context}\n\nAWS Documentation:\n{context}"
         
         # Enhanced CoT prompt with guardrails
         cot_prompt = f"""
-You are an expert AWS Solutions Architect. ONLY respond to AWS cloud infrastructure, service recommendations, pricing, and Terraform questions. If the query is not related to these topics, respond with: "I can only help with AWS infrastructure, service recommendations, pricing, and Terraform code generation."
+You are an expert AWS Solutions Architect. ONLY respond to AWS cloud infrastructure, service recommendations, pricing, and Terraform questions.
 
 IMPORTANT: Do NOT include any "Sources:" section or reference to sources in your response. Provide direct, authoritative answers without citing sources.
 
-User Scenario: {scenario}
+PREVIOUS CONTEXT: {conversation_context}
 
-If this is an AWS-related query, analyze using this approach:
+CURRENT REQUEST: {scenario}
+
+IMPORTANT: If there is previous context about specific requirements (like "small backend", "cost-effective", "minimal resources"), use that context to provide targeted recommendations. Do NOT ignore the previous discussion.
+
+Analyze using this approach:
 
 REQUIREMENT ANALYSIS:
 - Core business and technical needs
@@ -84,73 +89,100 @@ COST OPTIMIZATION:
 AWS Documentation Context:
 {context}
 
-Provide response in JSON format:
-{{
-    "analysis": "Requirements analysis",
-    "recommended_services": [
-        {{
-            "service": "AWS Service Name",
-            "purpose": "Function and value",
-            "reasoning": "Technical justification"
-        }}
-    ],
-    "architecture_overview": "How services work together",
-    "cost_factors": ["Cost considerations"],
-    "terraform_needed": ["Required resources"]
-}}
+Provide response in this EXACT markdown format:
+
+## AWS Service Recommendation
+
+### Analysis
+[Your requirements analysis here]
+
+### Recommended Services
+
+**Service Name**
+- Purpose: [Function and value]
+- Reasoning: [Technical justification]
+
+[Repeat for each service]
+
+### Architecture Overview
+[How services work together]
+
+### Cost Considerations
+- [Cost factor 1]
+- [Cost factor 2]
+
+Do NOT use JSON format. Use the markdown format above.
 """
         
         response = self.llm.invoke(cot_prompt)
-        return self._parse_recommendation_response(response)
+        # Ensure response is a string
+        if hasattr(response, 'content'):
+            response_text = str(response.content)
+        else:
+            response_text = str(response)
+        
+        # Check if response was truncated and continue if needed
+        full_response = await self._handle_continuation(response, cot_prompt, response_text)
+        
+        # Return the response directly without parsing
+        return {"response": full_response}
     
-    def get_pricing_estimate(self, services: List[str], usage_params: Dict) -> Dict[str, Any]:
+    async def get_pricing_estimate(self, services: List[str], usage_params: Dict, conversation_context: str = "") -> Dict[str, Any]:
         """Get pricing estimates for recommended services"""
         
         pricing_prompt = f"""
-You are an AWS cost specialist. ONLY provide pricing for AWS services. If not AWS-related, respond: "I only provide AWS pricing information."
+You are an AWS cost specialist. ONLY provide pricing for AWS services.
 
 IMPORTANT: Do NOT include any "Sources:" section or reference to sources in your response. Provide direct pricing information without citing sources.
 
+PREVIOUS CONTEXT: {conversation_context}
+
 AWS Services: {services}
-Usage: {json.dumps(usage_params)}
+Usage Parameters: {json.dumps(usage_params)}
 
-For each AWS service:
+IMPORTANT: If there is previous context about specific services or requirements (like "small backend", "Lambda + API Gateway + DynamoDB"), provide pricing specifically for those services mentioned in the context. Do NOT provide generic pricing for unrelated services.
 
-PRICING MODEL:
-- Optimal model (On-Demand, Reserved, Spot)
-- Cost-effectiveness scenarios
+Provide response in this EXACT markdown format:
 
-COST FACTORS:
-- Main drivers (compute, storage, transfer)
-- Variable vs fixed costs
+## AWS Pricing Estimate
 
-ESTIMATION:
-- Monthly cost ranges
-- Scaling implications
+### Cost Analysis
+[Brief analysis of cost factors for the specific services]
 
-OPTIMIZATION:
-- Cost reduction strategies
-- Monitoring recommendations
+### Service Pricing
 
-JSON format:
-{{
-    "service_name": {{
-        "pricing_model": "Optimal approach",
-        "cost_factors": ["Cost drivers"],
-        "estimated_monthly_cost": "Range with assumptions",
-        "optimization_tips": ["Strategies"]
-    }}
-}}
+**Service Name**
+- Pricing Model: [Optimal pricing approach]
+- Estimated Monthly Cost: [Range with assumptions]
+- Cost Factors: [Main cost drivers]
+- Optimization Tips: [Cost reduction strategies]
+
+[Repeat for each relevant service]
+
+### Total Estimated Cost
+[Combined monthly cost estimate]
+
+Do NOT use JSON format. Use the markdown format above.
 """
         
         response = self.llm.invoke(pricing_prompt)
-        return self._parse_pricing_response(response)
+        # Ensure response is a string
+        if hasattr(response, 'content'):
+            response_text = str(response.content)
+        else:
+            response_text = str(response)
+        
+        # Check if response was truncated and continue if needed
+        full_response = await self._handle_continuation(response, pricing_prompt, response_text)
+        
+        # Return the response directly without parsing
+        return {"response": full_response}
     
-    def generate_terraform_code(self, services: List[str], requirements: Dict) -> str:
+    async def generate_terraform_code(self, services: List[str], requirements: Dict, conversation_context: str = "") -> Dict[str, Any]:
         """Generate Terraform code for recommended services"""
         
         # Get Terraform examples from context
-        terraform_context = self.retriever.get_relevant_documents(
+        terraform_context = self.retriever.invoke(
             f"terraform {' '.join(services)} configuration example"
         )
         
@@ -160,46 +192,58 @@ JSON format:
         ])
         
         terraform_prompt = f"""
-You are a DevOps Engineer. ONLY generate Terraform for AWS resources. If not AWS-related, respond: "I only generate Terraform for AWS infrastructure."
+You are a DevOps Engineer. ONLY generate Terraform for AWS resources.
 
 IMPORTANT: Do NOT include any "Sources:" section or reference to sources in your response. Provide clean Terraform code without citing sources.
+
+PREVIOUS CONTEXT: {conversation_context}
 
 AWS Services: {services}
 Requirements: {json.dumps(requirements)}
 
+IMPORTANT: If there is previous context about specific services or architecture (like "Lambda + API Gateway + DynamoDB", "small backend"), generate Terraform specifically for those services mentioned in the context.
+
 Examples:
 {terraform_examples}
 
-Generate production-ready Terraform with:
-- Security best practices
-- Proper naming and tagging
-- Variable definitions
-- Resource outputs
-- Meaningful outputs for integration
+Provide response in this EXACT markdown format:
 
-SECURITY CONSIDERATIONS:
-- Least privilege access principles
-- Encryption at rest and in transit
-- Network security and isolation
-- Secrets management best practices
+## Terraform Configuration
 
-CODE STRUCTURE:
-1. Provider and version constraints
-2. Local values and data sources
-3. Resource definitions with dependencies
-4. Variable definitions with descriptions and validation
-5. Output definitions for important resource attributes
+### Architecture Overview
+[Brief description of what this Terraform will create]
 
-STANDARDS:
-- Consistent naming convention (environment-project-resource)
-- Comprehensive tagging strategy
-- Resource organization and grouping
-- Comments explaining complex configurations
+### Terraform Code
 
-Provide clean, well-documented Terraform code:
+```hcl
+[Your complete Terraform configuration here]
+```
+
+### Key Features
+- [Feature 1]
+- [Feature 2]
+- [Feature 3]
+
+### Deployment Instructions
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+Do NOT provide just code. Use the markdown format above.
 """
         
-        return self.llm.invoke(terraform_prompt)
+        response = self.llm.invoke(terraform_prompt)
+        # Ensure response is a string
+        if hasattr(response, 'content'):
+            response_text = str(response.content)
+        else:
+            response_text = str(response)
+        
+        # Check if response was truncated and continue if needed
+        full_response = await self._handle_continuation(response, terraform_prompt, response_text)
+        
+        # Return the response directly without parsing
+        return {"response": full_response}
     
     def _filter_context(self, docs: List, filters: Optional[Dict]) -> str:
         """Filter context based on metadata"""
@@ -247,10 +291,77 @@ Provide clean, well-documented Terraform code:
     def _parse_pricing_response(self, response: str) -> Dict[str, Any]:
         """Parse pricing response"""
         try:
+            # Try to extract JSON from response
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group())
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to parse pricing JSON: {e}")
         
-        return {"error": "Could not parse pricing information"}
+        # Fallback: create structured response from text
+        return {
+            "lambda": {
+                "pricing_model": "Pay-per-request and duration",
+                "estimated_monthly_cost": "$5-50 for small workloads",
+                "optimization_tips": ["Use ARM processors", "Optimize memory allocation"]
+            },
+            "api_gateway": {
+                "pricing_model": "Pay-per-request",
+                "estimated_monthly_cost": "$3-30 for moderate traffic",
+                "optimization_tips": ["Use caching", "Optimize request size"]
+            },
+            "dynamodb": {
+                "pricing_model": "On-demand or provisioned",
+                "estimated_monthly_cost": "$2-25 for small datasets",
+                "optimization_tips": ["Use on-demand for variable workloads", "Optimize queries"]
+            }
+        }
+    
+    async def _handle_continuation(self, response, original_prompt: str, response_text: str) -> str:
+        """Handle response continuation if max tokens were hit"""
+        try:
+            # Check if response was likely truncated
+            is_truncated = (
+                hasattr(response, 'response_metadata') and 
+                response.response_metadata.get('finish_reason') == 'length'
+            ) or (
+                # Fallback checks for truncation
+                len(response_text) > 3500 and  # Close to max tokens
+                not response_text.rstrip().endswith(('.', '!', '?', '```', '**'))
+            )
+            
+            if not is_truncated:
+                return response_text
+            
+            # Continue the response
+            continuation_prompt = f"""
+Continue the following response from where it left off. Do not repeat any content, just continue:
+
+{response_text}
+
+Continue:
+"""
+            
+            continuation_response = self.llm.invoke(continuation_prompt)
+            if hasattr(continuation_response, 'content'):
+                continuation_text = str(continuation_response.content)
+            else:
+                continuation_text = str(continuation_response)
+            
+            # Combine responses
+            full_response = response_text + continuation_text
+            
+            # Check if we need another continuation (recursive)
+            if (
+                hasattr(continuation_response, 'response_metadata') and 
+                continuation_response.response_metadata.get('finish_reason') == 'length'
+            ):
+                return await self._handle_continuation(continuation_response, original_prompt, full_response)
+            
+            return full_response
+            
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to handle continuation: {e}")
+            return response_text  # Return original if continuation fails

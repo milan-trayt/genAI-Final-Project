@@ -1303,6 +1303,63 @@ body {
   width: 100%;
 }
 
+/* Markdown table styles */
+.message-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+
+.message-content th,
+.message-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.message-content th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #374151;
+}
+
+.message-content tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.message-content tr:hover {
+  background-color: #f3f4f6;
+}
+
+.result-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+}
+
+.result-content th,
+.result-content td {
+  border: 1px solid #e2e8f0;
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.result-content th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #374151;
+}
+
+.result-content tr:nth-child(even) {
+  background-color: #f9fafb;
+}
+
+.result-content tr:hover {
+  background-color: #f3f4f6;
+}
+
 /* Responsive terminal */
 @media (max-width: 768px) {
   .terminal-content {

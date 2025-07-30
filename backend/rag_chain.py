@@ -6,6 +6,7 @@ LangChain RAG chain for response generation with comprehensive prompt templates 
 import asyncio
 import logging
 import time
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Union
 
 from langchain.chains import RetrievalQA, ConversationalRetrievalChain
@@ -212,24 +213,27 @@ class RAGChain:
         # Mode-specific guardrail prompts
         self.guardrail_prompts = {
             "general": PromptTemplate(
-                template="""You are a strict content filter. Evaluate ONLY this specific question, ignoring any previous context.
+                template="""You are evaluating a question for AWS/DevOps assistance. Consider the conversation context.
 
-Question: {question}
+{question}
 
-APPROVE only if the question is directly about:
+APPROVE if the question is about:
 - AWS services, pricing, or architecture
 - Cloud infrastructure or DevOps
 - Terraform or Infrastructure-as-Code
 - Technical system administration
+- Follow-up questions about previously discussed AWS/technical topics
+- Generic questions that make sense in the context of previous AWS discussions
+- Conversation management ("what did I ask", "previous questions", "history")
+- Meta questions about the chat or assistance
 
-REJECT if the question asks about:
-- Cooking, food, recipes (like "how to make tea", "cooking instructions")
+REJECT only if clearly asking about:
+- Cooking, food, recipes (like "how to make tea")
 - Sports, entertainment, hobbies
 - Personal advice, relationships, health
-- Non-technical topics
-- Any question about making, preparing, or cooking food
+- Explicitly non-technical topics unrelated to previous context
 
-IMPORTANT: Ignore any previous technical context. Evaluate ONLY the current question.
+If there's previous AWS/technical context, assume follow-up questions are technical.
 
 Respond with exactly "APPROVED" or "REJECTED":
 
@@ -237,34 +241,65 @@ Response:""",
                 input_variables=["question"]
             ),
             "service_recommendation": PromptTemplate(
-                template="""Determine if this question is asking for AWS service recommendations.
+                template="""You are evaluating a question in SERVICE RECOMMENDATION mode. Consider the conversation context.
 
-Question: {question}
+{question}
 
-APPROVE if asking for: AWS service suggestions, architecture recommendations, service comparisons, or contextual queries about services.
-REJECT if not related to AWS service selection or recommendations.
+Look at the conversation history above. 
+
+APPROVE if:
+- The question is directly about AWS services, architecture, or infrastructure
+- There's previous AWS/technical discussion AND the current question is a follow-up (like "final recommendation", "what do you recommend", "best option")
+- The question makes sense in the context of ongoing AWS service discussion
+
+REJECT if:
+- Asking about cooking, food, tea, recipes (even if using words like "recommend")
+- Sports, entertainment, personal advice
+- No AWS context exists AND the question is about non-technical topics
+
+Key rule: Generic recommendation requests are only approved if there's relevant AWS/technical context in the conversation history.
+
+Respond with exactly "APPROVED" or "REJECTED":
 
 Response:""",
                 input_variables=["question"]
             ),
             "pricing": PromptTemplate(
-                template="""Determine if this question is about AWS pricing or cost optimization.
+                template="""You are evaluating a question in PRICING mode. Consider the conversation context.
 
-Question: {question}
+{question}
 
-APPROVE if asking for: cost estimates, pricing comparisons, cost optimization, budget planning, or contextual pricing queries.
-REJECT if not related to AWS costs or pricing.
+Look at the conversation history above. If there's previous discussion about AWS services or costs, then follow-up questions like "create pricing estimate", "how much would this cost", "what's the pricing" should be APPROVED as they relate to the ongoing AWS discussion.
+
+APPROVE if:
+- Directly asking for AWS pricing information
+- Follow-up questions when there's previous AWS/cost context
+- Questions that make sense given the conversation history
+- Cost optimization or budget planning requests
+
+REJECT only if clearly unrelated to AWS/cost topics AND no relevant context exists.
+
+Respond with exactly "APPROVED" or "REJECTED":
 
 Response:""",
                 input_variables=["question"]
             ),
             "terraform": PromptTemplate(
-                template="""Determine if this question is about Terraform or Infrastructure-as-Code.
+                template="""You are evaluating a question in TERRAFORM mode. Consider the conversation context.
 
-Question: {question}
+{question}
 
-APPROVE if asking for: Terraform code, IaC patterns, infrastructure automation, or contextual Terraform queries.
-REJECT if not related to Terraform or infrastructure code.
+Look at the conversation history above. If there's previous discussion about AWS services, infrastructure, or deployment, then follow-up questions like "generate terraform code", "how to deploy this", "create infrastructure" should be APPROVED as they relate to the ongoing technical discussion.
+
+APPROVE if:
+- Directly asking for Terraform code or IaC help
+- Follow-up questions when there's previous infrastructure context
+- Questions that make sense given the conversation history
+- Infrastructure automation or deployment requests
+
+REJECT only if clearly unrelated to infrastructure/technical topics AND no relevant context exists.
+
+Respond with exactly "APPROVED" or "REJECTED":
 
 Response:""",
                 input_variables=["question"]
@@ -440,8 +475,11 @@ Use the provided context to answer questions accurately. Always cite your source
             response_text = result.get('result', '')
             source_documents = result.get('source_documents', [])
             
-            # Use response directly
-            final_response = response_text
+            # Ensure response is a string
+            if hasattr(response_text, 'content'):
+                final_response = str(response_text.content)
+            else:
+                final_response = str(response_text)
             
             # Convert source documents
             sources = []
@@ -493,24 +531,7 @@ Use the provided context to answer questions accurately. Always cite your source
         start_time = time.time()
         
         try:
-            # Step 1: Get mode-specific prompts
-            mode_prompts = self._get_mode_prompts(query_type)
-            
-            # Step 2: Guardrail validation (handles both contextual and non-contextual queries)
-            validation_result = await mode_prompts["guardrail"].ainvoke({"question": question})
-            validation_response = validation_result.content.strip().upper()
-            
-            logger.info(f"Guardrail validation for '{question}': {validation_response}")
-            
-            if "REJECTED" in validation_response or "REJECT" in validation_response:
-                return QueryResult(
-                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
-                    sources=[],
-                    processing_time=time.time() - start_time,
-                    cached=False
-                )
-            
-            # Step 2: Process approved conversational query
+            # Step 1: Load session and get memory first
             session_loaded = await self.session_manager.load_session(session_id)
             if not session_loaded:
                 logger.warning(f"Session {session_id} not found, creating new session")
@@ -521,63 +542,167 @@ Use the provided context to answer questions accurately. Always cite your source
             memory = self.session_manager.get_memory(session_id)
             if not memory:
                 logger.error(f"Failed to get memory for session {session_id}")
-                return await self.query_oneshot(question, top_k)
+                return await self.query_oneshot(question, query_type, top_k)
             
-            # Update retriever search parameters
-            self.query_processor.retriever.search_kwargs = {"k": top_k}
-            
-            # Ensure messages are loaded before accessing chat history
+            # Ensure messages are loaded
             await self.session_manager.ensure_messages_loaded(session_id)
             
-            # Get chat history BEFORE adding current question (for context)
-            chat_history = []
-            if memory and hasattr(memory, 'chat_memory'):
-                messages = memory.chat_memory.messages
-                # Process complete pairs of human/ai messages for context
-                for i in range(0, len(messages), 2):
-                    if i + 1 < len(messages):
-                        human_msg = messages[i]
-                        ai_msg = messages[i + 1]
-                        chat_history.append((human_msg.content, ai_msg.content))
+            # Debug: Check if messages are loaded
+            if hasattr(memory, 'chat_memory') and memory.chat_memory.messages:
+                logger.info(f"Found {len(memory.chat_memory.messages)} messages in session {session_id}")
+                for i, msg in enumerate(memory.chat_memory.messages):
+                    msg_type = "Human" if isinstance(msg, HumanMessage) else "AI"
+                    logger.info(f"Message {i}: {msg_type} - {msg.content[:100]}...")
+            else:
+                logger.info(f"No messages found in session {session_id}")
             
-            # Add current user message to session AFTER getting history
+            # Step 2: Get mode-specific prompts
+            mode_prompts = self._get_mode_prompts(query_type)
+            
+            # Add user message to session for all query types
             await self.session_manager.add_user_message(question, session_id)
             
-            # Run conversational chain
-            result = self.conversational_chain.invoke({
-                "question": question,
-                "chat_history": chat_history
-            })
+            # Get recent AI messages for context
+            conversation_context = ""
+            if memory and hasattr(memory, 'chat_memory') and memory.chat_memory.messages:
+                # Get only AI messages for context
+                ai_messages = [msg for msg in memory.chat_memory.messages if isinstance(msg, AIMessage)]
+                if ai_messages:
+                    # Get last 2 AI responses with full content
+                    recent_ai_messages = ai_messages[-2:]
+                    context_parts = []
+                    for msg in recent_ai_messages:
+                        context_parts.append(f"Previous AI response: {msg.content}")
+                    conversation_context = "\n\n".join(context_parts)
+                    logger.info(f"AI message context for guardrail: {conversation_context[:500]}...")
+                else:
+                    logger.info("No AI messages available for context")
+                    logger.info(f"Total messages in memory: {len(memory.chat_memory.messages) if memory and hasattr(memory, 'chat_memory') else 0}")
+            else:
+                logger.info("No conversation context available for guardrail")
             
-            # Extract response and sources
-            response_text = result.get('answer', '')
-            source_documents = result.get('source_documents', [])
+            # Create contextual question for guardrail
+            contextual_question = f"""Previous AI responses:
+{conversation_context}
+
+Current question: {question}"""
             
-            # Use response directly
-            final_response = response_text
+            # Guardrail validation with context for ALL modes
+            validation_result = await mode_prompts["guardrail"].ainvoke({"question": contextual_question})
+            validation_response = validation_result.content.strip().upper()
             
-            # Convert source documents
-            sources = []
-            for doc in source_documents:
-                source = SourceDocument.from_langchain_document(
-                    doc, 
-                    doc.metadata.get('relevance_score', 0.0)
+            logger.info(f"Guardrail validation for '{question}' in {query_type} mode: {validation_response}")
+            
+            if "REJECTED" in validation_response or "REJECT" in validation_response:
+                return QueryResult(
+                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
+                    sources=[],
+                    processing_time=time.time() - start_time,
+                    cached=False
                 )
-                sources.append(source)
             
-            # Add AI response to session AFTER processing
-            await self.session_manager.add_ai_message(final_response, session_id)
+            # Step 3: Process query based on type
+            if query_type == "service_recommendation":
+                from rag_service import get_rag_service
+                rag_service = await get_rag_service()
+                result_data = await rag_service._handle_service_recommendation(question, session_id, filters)
+                result = {
+                    "response": result_data["response"],
+                    "processing_time": result_data["processing_time"],
+                    "cached": result_data["cached"],
+                    "sources": []
+                }
+            elif query_type == "pricing":
+                from rag_service import get_rag_service
+                rag_service = await get_rag_service()
+                result_data = await rag_service._handle_pricing_query(question, session_id)
+                result = {
+                    "response": result_data["response"],
+                    "processing_time": result_data["processing_time"],
+                    "cached": result_data["cached"],
+                    "sources": []
+                }
+            elif query_type == "terraform":
+                from rag_service import get_rag_service
+                rag_service = await get_rag_service()
+                result_data = await rag_service._handle_terraform_query(question, session_id)
+                result = {
+                    "response": result_data["response"],
+                    "processing_time": result_data["processing_time"],
+                    "cached": result_data["cached"],
+                    "sources": []
+                }
+            else:
+                if "REJECTED" in validation_response or "REJECT" in validation_response:
+                    return QueryResult(
+                        response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
+                        sources=[],
+                        processing_time=time.time() - start_time,
+                        cached=False
+                    )
+                
+                # Update retriever search parameters
+                self.query_processor.retriever.search_kwargs = {"k": top_k}
+                
+                # Get chat history BEFORE adding current question (for context)
+                chat_history = []
+                if memory and hasattr(memory, 'chat_memory'):
+                    messages = memory.chat_memory.messages
+                    # Process complete pairs of human/ai messages for context
+                    for i in range(0, len(messages), 2):
+                        if i + 1 < len(messages):
+                            human_msg = messages[i]
+                            ai_msg = messages[i + 1]
+                            chat_history.append((human_msg.content, ai_msg.content))
+                
+                # Add current user message to session AFTER getting history
+                await self.session_manager.add_user_message(question, session_id)
+                
+                # Run conversational chain
+                result = self.conversational_chain.invoke({
+                    "question": question,
+                    "chat_history": chat_history
+                })
+                
+                # Extract response and sources
+                response_text = result.get('answer', '')
+                source_documents = result.get('source_documents', [])
+                
+                # Ensure response is a string
+                if hasattr(response_text, 'content'):
+                    final_response = str(response_text.content)
+                else:
+                    final_response = str(response_text)
+                
+                # Convert source documents
+                sources = []
+                for doc in source_documents:
+                    source = SourceDocument.from_langchain_document(
+                        doc, 
+                        doc.metadata.get('relevance_score', 0.0)
+                    )
+                    sources.append(source)
+                
+                result = {
+                    "response": final_response,
+                    "processing_time": time.time() - start_time,
+                    "cached": False,
+                    "query_type": "general",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            # Add AI response to session for all query types
+            await self.session_manager.add_ai_message(result["response"], session_id)
             
             processing_time = time.time() - start_time
             
-            logger.info(f"Conversational query completed in {processing_time:.2f}s")
-            
             return QueryResult(
-                response=final_response,
-                sources=sources,
+                response=result["response"],
+                sources=result.get("sources", []),
                 processing_time=processing_time,
-                cached=False
+                cached=result.get("cached", False)
             )
+
             
         except Exception as e:
             logger.error(f"Conversational query failed: {e}")

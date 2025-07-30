@@ -89,9 +89,9 @@ class RAGService:
             result = await self.rag_chain.query_oneshot(query, query_type, top_k)
             
             return {
-                "response": result.response,
-                "processing_time": result.processing_time,
-                "cached": result.cached,
+                "response": str(result.response),
+                "processing_time": float(result.processing_time),
+                "cached": bool(result.cached),
                 "timestamp": datetime.utcnow().isoformat()
             }
             
@@ -105,6 +105,13 @@ class RAGService:
             await self.initialize()
         
         try:
+            # Save user message ONCE at the beginning for ALL query types
+            try:
+                await self.session_manager.add_user_message(query, session_id)
+                logger.info(f"Saved user message to session {session_id}: {query[:50]}...")
+            except Exception as e:
+                logger.error(f"Failed to save user message: {e}")
+            
             # Route query based on type
             if query_type == "service_recommendation":
                 result = await self._handle_service_recommendation(query, session_id, filters)
@@ -119,9 +126,9 @@ class RAGService:
                     await self.initialize()
                 result = await self.rag_chain.query_conversational(query, session_id, query_type, top_k)
                 result = {
-                    "response": result.response,
-                    "processing_time": result.processing_time,
-                    "cached": result.cached,
+                    "response": str(result.response),
+                    "processing_time": float(result.processing_time),
+                    "cached": bool(result.cached),
                     "query_type": "general",
                     "timestamp": datetime.utcnow().isoformat()
                 }
@@ -134,83 +141,183 @@ class RAGService:
     
     async def _handle_service_recommendation(self, query: str, session_id: str, filters: Optional[Dict] = None) -> Dict[str, Any]:
         """Handle service recommendation queries with CoT reasoning"""
-        recommendation = self.aws_recommender.recommend_services(query, filters)
-        
-        if "error" in recommendation:
+        try:
+            logger.info(f"Service recommendation handler called for query: {query[:50]}...")
+            
+            # User message already saved at top level
+            
+            # Get conversation context from session
+            conversation_context = ""
+            try:
+                history = await self.get_session_history(session_id)
+                if history:
+                    # Get last few AI messages for context
+                    ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
+                    if ai_messages:
+                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        context_parts = [msg['content'] for msg in recent_messages]
+                        conversation_context = "\n\n".join(context_parts)
+                        logger.info(f"Using conversation context: {conversation_context[:200]}...")
+            except Exception as e:
+                logger.warning(f"Could not get conversation context: {e}")
+            
+            recommendation = await self.aws_recommender.recommend_services(query, filters, conversation_context)
+            logger.info(f"AWS recommender returned: {type(recommendation)} - {str(recommendation)[:200]}...")
+            
+            if "error" in recommendation:
+                logger.info(f"Service recommendation error: {recommendation['error']}")
+                return {
+                    "response": str(recommendation["error"]),
+                    "processing_time": 0.5,
+                    "cached": False,
+                    "query_type": "service_recommendation",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            # Use the direct response from the LLM
+            response = recommendation.get("response", "No response available")
+        except Exception as e:
+            logger.error(f"Service recommendation failed: {e}")
             return {
-                "response": recommendation["error"],
+                "response": "I apologize, but I encountered an error processing your service recommendation request. Please try again.",
+                "processing_time": 0.5,
+                "cached": False,
                 "query_type": "service_recommendation",
                 "timestamp": datetime.utcnow().isoformat()
             }
         
-        # Format response with CoT reasoning
-        response = f"""## AWS Service Recommendation
-
-### Analysis
-{recommendation.get('analysis', '')}
-
-### Recommended Services
-"""
+        # No need for complex formatting since LLM returns formatted response directly
         
-        for service in recommendation.get('recommended_services', []):
-            response += f"\n**{service.get('service')}**\n- Purpose: {service.get('purpose')}\n- Reasoning: {service.get('reasoning')}\n"
+        # Save the response to session
+        try:
+            await self.session_manager.add_ai_message(str(response), session_id)
+            logger.info(f"Saved service recommendation response to session {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to save response to session: {e}")
         
-        response += f"\n### Architecture Overview\n{recommendation.get('architecture_overview', '')}"
-        
-        if recommendation.get('cost_factors'):
-            response += f"\n\n### Cost Considerations\n" + "\n".join([f"- {factor}" for factor in recommendation['cost_factors']])
+        logger.info(f"Formatted response length: {len(response)} chars")
         
         return {
-            "response": response,
+            "response": str(response),
             "processing_time": 0.5,
             "cached": False,
-            "recommendation": recommendation,
             "query_type": "service_recommendation",
             "timestamp": datetime.utcnow().isoformat()
         }
     
     async def _handle_pricing_query(self, query: str, session_id: str) -> Dict[str, Any]:
         """Handle pricing estimation queries"""
-        services = self._extract_services_from_query(query)
-        usage_params = self._extract_usage_params(query)
-        
-        pricing = self.aws_recommender.get_pricing_estimate(services, usage_params)
-        
-        response = "## AWS Pricing Estimate\n\n"
-        for service, details in pricing.items():
-            if service != "error":
-                response += f"**{service}:**\n"
-                response += f"- Pricing Model: {details.get('pricing_model', 'N/A')}\n"
-                response += f"- Estimated Monthly Cost: {details.get('estimated_monthly_cost', 'N/A')}\n"
-                if details.get('optimization_tips'):
-                    response += f"- Optimization Tips: {', '.join(details['optimization_tips'])}\n\n"
-        
-        return {
-            "response": response,
-            "processing_time": 0.5,
-            "cached": False,
-            "pricing": pricing,
-            "query_type": "pricing",
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        try:
+            # User message already saved at top level
+            
+            # Get conversation context from session
+            conversation_context = ""
+            try:
+                history = await self.get_session_history(session_id)
+                if history:
+                    # Get last few AI messages for context
+                    ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
+                    if ai_messages:
+                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        context_parts = [msg['content'] for msg in recent_messages]
+                        conversation_context = "\n\n".join(context_parts)
+                        logger.info(f"Using conversation context for pricing: {conversation_context[:200]}...")
+            except Exception as e:
+                logger.warning(f"Could not get conversation context: {e}")
+            
+            services = self._extract_services_from_query(query)
+            usage_params = self._extract_usage_params(query)
+            usage_params['usage_pattern'] = 'mid'  # Default to mid usage
+            
+            pricing = await self.aws_recommender.get_pricing_estimate(services, usage_params, conversation_context)
+            
+            if "error" in pricing:
+                return {
+                    "response": str(pricing["error"]),
+                    "processing_time": 0.5,
+                    "cached": False,
+                    "query_type": "pricing",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            # Use the direct response from the LLM
+            response = pricing.get("response", "No pricing information available")
+            
+            # Save the response to session
+            try:
+                await self.session_manager.add_ai_message(str(response), session_id)
+                logger.info(f"Saved pricing response to session {session_id}")
+            except Exception as e:
+                logger.error(f"Failed to save response to session: {e}")
+            
+            return {
+                "response": str(response),
+                "processing_time": 0.5,
+                "cached": False,
+                "query_type": "pricing",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Pricing query failed: {e}")
+            return {
+                "response": "I apologize, but I encountered an error processing your pricing request. Please try again.",
+                "processing_time": 0.5,
+                "cached": False,
+                "query_type": "pricing",
+                "timestamp": datetime.utcnow().isoformat()
+            }
     
     async def _handle_terraform_query(self, query: str, session_id: str) -> Dict[str, Any]:
         """Handle Terraform code generation queries"""
-        services = self._extract_services_from_query(query)
-        requirements = self._extract_requirements_from_query(query)
-        
-        terraform_code = self.aws_recommender.generate_terraform_code(services, requirements)
-        
-        response = f"## Terraform Configuration\n\n```hcl\n{terraform_code}\n```"
-        
-        return {
-            "response": response,
-            "processing_time": 0.5,
-            "cached": False,
-            "terraform_code": terraform_code,
-            "query_type": "terraform",
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        try:
+            # User message already saved at top level
+            
+            # Get conversation context from session
+            conversation_context = ""
+            try:
+                history = await self.get_session_history(session_id)
+                if history:
+                    # Get last few AI messages for context
+                    ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
+                    if ai_messages:
+                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        context_parts = [msg['content'] for msg in recent_messages]
+                        conversation_context = "\n\n".join(context_parts)
+                        logger.info(f"Using conversation context for terraform: {conversation_context[:200]}...")
+            except Exception as e:
+                logger.warning(f"Could not get conversation context: {e}")
+            
+            services = self._extract_services_from_query(query)
+            requirements = self._extract_requirements_from_query(query)
+            
+            terraform_result = await self.aws_recommender.generate_terraform_code(services, requirements, conversation_context)
+            
+            # Use the direct response from the LLM
+            response = terraform_result.get("response", "No Terraform code available")
+            
+            # Save the response to session
+            try:
+                await self.session_manager.add_ai_message(str(response), session_id)
+                logger.info(f"Saved terraform response to session {session_id}")
+            except Exception as e:
+                logger.error(f"Failed to save response to session: {e}")
+            
+            return {
+                "response": str(response),
+                "processing_time": 0.5,
+                "cached": False,
+                "query_type": "terraform",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Terraform query failed: {e}")
+            return {
+                "response": "I apologize, but I encountered an error generating Terraform code. Please try again.",
+                "processing_time": 0.5,
+                "cached": False,
+                "query_type": "terraform",
+                "timestamp": datetime.utcnow().isoformat()
+            }
     
     def _extract_services_from_query(self, query: str) -> List[str]:
         """Extract AWS services mentioned in query"""
@@ -282,7 +389,8 @@ class RAGService:
             )
             
             prompt_text = topic_prompt.format(query=query)
-            topic = await self.rag_chain.llm.apredict(prompt_text)
+            response = await self.rag_chain.llm.ainvoke(prompt_text)
+            topic = response.content if hasattr(response, 'content') else str(response)
             
             # Clean up the response
             topic = topic.strip().replace('"', '').replace("'", "")
@@ -381,9 +489,10 @@ class RAGService:
             messages = []
             for message in history.messages:
                 role = "user" if message.__class__.__name__ == "HumanMessage" else "assistant"
+                content = message.content if hasattr(message, 'content') else str(message)
                 messages.append({
                     "role": role,
-                    "content": message.content,
+                    "content": content,
                     "timestamp": datetime.utcnow().isoformat()
                 })
             

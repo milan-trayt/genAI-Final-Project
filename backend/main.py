@@ -152,23 +152,28 @@ async def conversational_query(
 ):
     """Process a conversational query with session context."""
     try:
-        logger.info(f"Processing conversational query for session {request.session_id}: {request.query[:50]}...")
+        logger.info(f"Processing conversational query for session {request.session_id}: {request.query[:50]}... (query_type: {getattr(request, 'query_type', 'general')})")
+        
+        query_type = getattr(request, 'query_type', 'general')
+        logger.info(f"Calling rag_service.process_conversational_query with query_type: {query_type}")
         
         result = await rag_service.process_conversational_query(
             query=request.query,
             session_id=request.session_id,
-            query_type=getattr(request, 'query_type', 'general'),
+            query_type=query_type,
             filters=None,
             top_k=request.top_k
         )
         
-        # Add query_type and metadata to response
+        logger.info(f"Got result from rag_service: {type(result)}")
+        
+        # Ensure all values are serializable
         response_data = {
-            "response": result["response"],
-            "processing_time": result["processing_time"],
-            "cached": result["cached"],
-            "timestamp": result["timestamp"],
-            "query_type": result.get("query_type", "general"),
+            "response": str(result["response"]),
+            "processing_time": float(result["processing_time"]),
+            "cached": bool(result["cached"]),
+            "timestamp": str(result["timestamp"]),
+            "query_type": str(result.get("query_type", "general")),
             "metadata": {
                 "recommendation": result.get("recommendation"),
                 "pricing": result.get("pricing"),
@@ -176,6 +181,7 @@ async def conversational_query(
             }
         }
         
+        logger.info(f"Returning response with query_type: {response_data.get('query_type')}")
         return QueryResponse(**response_data)
         
     except Exception as e:
