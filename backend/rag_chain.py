@@ -269,15 +269,20 @@ Response:""",
 
 {question}
 
-Look at the conversation history above. If there's previous discussion about AWS services or costs, then follow-up questions like "create pricing estimate", "how much would this cost", "what's the pricing" should be APPROVED as they relate to the ongoing AWS discussion.
+Look at the conversation history above. Check if:
+1. The question is directly about AWS pricing/costs
+2. There's previous AWS discussion that makes this question relevant
+3. The question makes sense in the context of ongoing AWS conversation
 
 APPROVE if:
 - Directly asking for AWS pricing information
-- Follow-up questions when there's previous AWS/cost context
-- Questions that make sense given the conversation history
-- Cost optimization or budget planning requests
+- Follow-up questions when there's previous AWS context (even generic questions like "how much", "create invoice")
+- Questions that relate to previously discussed AWS services
+- Cost optimization requests with AWS context
 
-REJECT only if clearly unrelated to AWS/cost topics AND no relevant context exists.
+REJECT if:
+- Asking about non-AWS topics (cooking, tea, sports) AND no AWS context exists
+- Completely unrelated questions with no connection to previous AWS discussion
 
 Respond with exactly "APPROVED" or "REJECTED":
 

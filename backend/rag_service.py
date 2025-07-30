@@ -229,7 +229,7 @@ class RAGService:
             usage_params = self._extract_usage_params(query)
             usage_params['usage_pattern'] = 'mid'  # Default to mid usage
             
-            pricing = await self.aws_recommender.get_pricing_estimate(services, usage_params, conversation_context)
+            pricing = await self.aws_recommender.get_pricing_estimate(services, usage_params, conversation_context, query)
             
             if "error" in pricing:
                 return {

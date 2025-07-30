@@ -127,7 +127,7 @@ Do NOT use JSON format. Use the markdown format above.
         # Return the response directly without parsing
         return {"response": full_response}
     
-    async def get_pricing_estimate(self, services: List[str], usage_params: Dict, conversation_context: str = "") -> Dict[str, Any]:
+    async def get_pricing_estimate(self, services: List[str], usage_params: Dict, conversation_context: str = "", scenario: str = "") -> Dict[str, Any]:
         """Get pricing estimates for recommended services"""
         
         pricing_prompt = f"""
@@ -139,30 +139,39 @@ PREVIOUS CONTEXT: {conversation_context}
 
 AWS Services: {services}
 Usage Parameters: {json.dumps(usage_params)}
+User Request: {scenario}
 
 IMPORTANT: If there is previous context about specific services or requirements (like "small backend", "Lambda + API Gateway + DynamoDB"), provide pricing specifically for those services mentioned in the context. Do NOT provide generic pricing for unrelated services.
 
-Provide response in this EXACT markdown format:
+CURRENT REQUEST: {scenario}
+
+If the request asks for "invoice", "tabular format", "table", or "billing format", provide response as a detailed invoice table. Otherwise use standard markdown format.
+
+For INVOICE/TABLE format, use:
+
+# AWS PRICING INVOICE
+ 
+**Billing Period:** Monthly
+
+| Service | Description | Quantity | Unit Price | Monthly Cost |
+|---------|-------------|----------|------------|-------------|
+| [Service] | [Details] | [Amount] | [Rate] | [Cost] |
+
+**TOTAL MONTHLY COST: $[Amount]**
+
+For STANDARD format, use:
 
 ## AWS Pricing Estimate
 
 ### Cost Analysis
-[Brief analysis of cost factors for the specific services]
+[Brief analysis]
 
 ### Service Pricing
-
 **Service Name**
-- Pricing Model: [Optimal pricing approach]
-- Estimated Monthly Cost: [Range with assumptions]
-- Cost Factors: [Main cost drivers]
-- Optimization Tips: [Cost reduction strategies]
+- Pricing Model: [Model]
+- Estimated Monthly Cost: [Cost]
 
-[Repeat for each relevant service]
-
-### Total Estimated Cost
-[Combined monthly cost estimate]
-
-Do NOT use JSON format. Use the markdown format above.
+Do NOT respond to non-AWS queries like cooking, tea, sports, etc. If not AWS-related, respond: "I only provide AWS pricing information."
 """
         
         response = self.llm.invoke(pricing_prompt)
