@@ -67,3 +67,8 @@ develop-eggs/
 
 # Local config
 *.local
+
+#ufiles innside uploads and data directories
+uploads/
+data/
+.Trash*

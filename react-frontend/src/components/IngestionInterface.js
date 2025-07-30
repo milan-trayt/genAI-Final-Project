@@ -375,7 +375,7 @@ const IngestionInterface = () => {
             <div className="tab-content">
               {activeTab === 'web' && <WebTab addSource={addSource} />}
               {activeTab === 'github' && <GitHubTab addSource={addSource} />}
-              {activeTab === 'files' && <FilesTab addSource={addSource} />}
+              {activeTab === 'files' && <FilesTab addSource={addSource} collabUrl={COLLAB_URL} />}
 
             </div>
 
@@ -598,7 +598,7 @@ const GitHubTab = ({ addSource }) => {
   );
 };
 
-const FilesTab = ({ addSource }) => {
+const FilesTab = ({ addSource, collabUrl }) => {
   const [uploading, setUploading] = useState(false);
   
   const onDrop = useCallback(async (acceptedFiles) => {
@@ -611,7 +611,7 @@ const FilesTab = ({ addSource }) => {
         const formData = new FormData();
         formData.append('file', file);
         
-        const uploadResponse = await axios.post(`${COLLAB_URL}/api/upload`, formData, {
+        const uploadResponse = await axios.post(`${collabUrl}/api/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -620,32 +620,35 @@ const FilesTab = ({ addSource }) => {
         if (uploadResponse.data.status === 'success') {
           addSource({
             type: file.type.includes('pdf') ? 'pdf' : 'csv',
-            name: `${file.name} (${i + 1})`,
+            name: file.name,
             path: uploadResponse.data.filepath,
             uploaded: true
           });
         }
       } catch (error) {
-        console.error('Upload error:', error);
+        console.error('Upload failed for', file.name, error);
       }
     }
     
     setUploading(false);
-  }, [addSource]);
+  }, [addSource, collabUrl]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
       'text/csv': ['.csv']
-    }
+    },
+    disabled: uploading,
+    noClick: false,
+    noKeyboard: false
   });
 
   return (
     <div className="files-tab">
       <h3>📁 File Upload</h3>
       <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''} ${uploading ? 'uploading' : ''}`}>
-        <input {...getInputProps()} disabled={uploading} />
+        <input {...getInputProps()} />
         <FileText size={48} />
         {uploading ? (
           <p>Uploading files...</p>
