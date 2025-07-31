@@ -248,18 +248,31 @@ class RedisManager:
             if not cached_data:
                 return None
             
+            # Validate cached data is valid JSON
+            if not isinstance(cached_data, str):
+                logger.warning(f"Invalid cached data type for session {session_id}: {type(cached_data)}")
+                return None
+            
             messages_data = json.loads(cached_data)
+            if not isinstance(messages_data, list):
+                logger.warning(f"Invalid message data format for session {session_id}: expected list, got {type(messages_data)}")
+                return None
+            
             messages = []
             
             for msg_data in messages_data:
-                if msg_data['type'] == 'human':
+                if not isinstance(msg_data, dict):
+                    logger.warning(f"Skipping invalid message data: {type(msg_data)}")
+                    continue
+                    
+                if msg_data.get('type') == 'human':
                     message = HumanMessage(
-                        content=msg_data['content'],
+                        content=msg_data.get('content', ''),
                         additional_kwargs=msg_data.get('additional_kwargs', {})
                     )
-                elif msg_data['type'] == 'ai':
+                elif msg_data.get('type') == 'ai':
                     message = AIMessage(
-                        content=msg_data['content'],
+                        content=msg_data.get('content', ''),
                         additional_kwargs=msg_data.get('additional_kwargs', {})
                     )
                 else:
@@ -268,6 +281,9 @@ class RedisManager:
                 messages.append(message)
             
             return messages
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON decode error for session {session_id}: {e}")
+            return None
         except Exception as e:
             logger.warning(f"Session message retrieval failed for {session_id}: {e}")
             return None

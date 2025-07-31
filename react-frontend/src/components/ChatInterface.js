@@ -8,7 +8,9 @@ import '../QueryTypeSelector.css';
 
 const ChatInterface = () => {
   const [sessions, setSessions] = useState([]);
-  const [activeSession, setActiveSession] = useState(null);
+  const [activeSession, setActiveSession] = useState(() => {
+    return localStorage.getItem('activeSession') || null;
+  });
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -27,21 +29,25 @@ const ChatInterface = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [sessions]);
+  }, [sessions, activeSession]);
 
   const loadSessions = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/sessions`);
+      const response = await axios.get(`${API_BASE_URL}/sessions?t=${Date.now()}`);
       const sessionData = await Promise.all(
         response.data.sessions.map(async (session) => {
           // Load messages for each session
           try {
-            const historyResponse = await axios.get(`${API_BASE_URL}/sessions/${session.session_id}/history`);
+            const historyResponse = await axios.get(`${API_BASE_URL}/sessions/${session.session_id}/history?t=${Date.now()}`);
+            console.log('Loaded messages:', historyResponse.data.messages);
             return {
               id: session.session_id,
               name: session.session_name,
               sessionId: session.session_id,
-              messages: historyResponse.data.messages || [],
+              messages: (historyResponse.data.messages || []).map(msg => ({
+                ...msg,
+                query_type: msg.query_type || 'general'
+              })),
               createdAt: session.created_at,
               updatedAt: session.updated_at
             };
@@ -59,6 +65,15 @@ const ChatInterface = () => {
         })
       );
       setSessions(sessionData);
+      
+      // Restore active session if it exists
+      const savedActiveSession = localStorage.getItem('activeSession');
+      if (savedActiveSession && sessionData.find(s => s.id === savedActiveSession)) {
+        setActiveSession(savedActiveSession);
+      } else if (sessionData.length > 0 && !activeSession) {
+        setActiveSession(sessionData[0].id);
+      }
+      
       setIsInitialized(true);
     } catch (error) {
       console.error('Failed to load sessions:', error);
@@ -82,6 +97,7 @@ const ChatInterface = () => {
       
       setSessions([...sessions, newSession]);
       setActiveSession(response.data.session_id);
+      localStorage.setItem('activeSession', response.data.session_id);
     } catch (error) {
       console.error('Failed to create session:', error);
     }
@@ -94,7 +110,13 @@ const ChatInterface = () => {
       setSessions(newSessions);
       
       if (activeSession === sessionId) {
-        setActiveSession(newSessions.length > 0 ? newSessions[0].id : null);
+        const newActiveSession = newSessions.length > 0 ? newSessions[0].id : null;
+        setActiveSession(newActiveSession);
+        if (newActiveSession) {
+          localStorage.setItem('activeSession', newActiveSession);
+        } else {
+          localStorage.removeItem('activeSession');
+        }
       }
     } catch (error) {
       console.error('Failed to delete session:', error);
@@ -179,28 +201,75 @@ const ChatInterface = () => {
         query_type: queryType
       });
 
-      const assistantMessage = {
-        role: 'assistant',
-        content: response.data.response,
-        query_type: response.data.query_type,
-        metadata: response.data.metadata
-      };
-
-      // Check if guardrail was triggered and if this is the first message
-      const isGuardrailResponse = response.data.response.includes('I can only help with AWS cloud infrastructure');
-      const isFirstUserMessage = currentSession.messages.length === 0;
+      // Check if guardrail was triggered
+      const isGuardrailDeleteSession = response.data.response.startsWith('GUARDRAIL_REJECTED_DELETE:');
+      const isGuardrailRejected = response.data.response.startsWith('GUARDRAIL_REJECTED:');
       
-      if (isGuardrailResponse && isFirstUserMessage) {
-        // Delete the session only if it's the first message
-        try {
-          await axios.delete(`${API_BASE_URL}/sessions/${currentSession.sessionId}`);
-          const newSessions = sessions.filter(s => s.id !== activeSession);
-          setSessions(newSessions);
-          setActiveSession(null);
-        } catch (error) {
-          console.error('Failed to delete session:', error);
-        }
-      } else {
+      if (isGuardrailDeleteSession) {
+        // Show toast for session deletion
+        const toastMessage = document.createElement('div');
+        toastMessage.className = 'toast-message error';
+        toastMessage.textContent = 'Session closed due to invalid question. Please ask about AWS/DevOps topics only.';
+        toastMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #ff4444;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          z-index: 10000;
+          font-weight: 500;
+          max-width: 300px;
+        `;
+        document.body.appendChild(toastMessage);
+        
+        setTimeout(() => {
+          if (document.body.contains(toastMessage)) {
+            document.body.removeChild(toastMessage);
+          }
+        }, 4000);
+        
+        // Remove session from frontend (backend already deleted it)
+        const newSessions = sessions.filter(s => s.id !== activeSession);
+        setSessions(newSessions);
+        setActiveSession(newSessions.length > 0 ? newSessions[0].id : null);
+        
+        return; // Don't add the message to chat
+      } else if (isGuardrailRejected) {
+        // Show toast for rejected question but keep session
+        const toastMessage = document.createElement('div');
+        toastMessage.className = 'toast-message warning';
+        toastMessage.textContent = 'Invalid question. Please ask about AWS/DevOps topics only.';
+        toastMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #ff9800;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 8px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+          z-index: 10000;
+          font-weight: 500;
+          max-width: 300px;
+        `;
+        document.body.appendChild(toastMessage);
+        
+        setTimeout(() => {
+          if (document.body.contains(toastMessage)) {
+            document.body.removeChild(toastMessage);
+          }
+        }, 3000);
+        
+        // Add the rejection message to chat but keep session
+        const assistantMessage = {
+          role: 'assistant',
+          content: response.data.response.replace('GUARDRAIL_REJECTED:', '').trim(),
+          query_type: 'guardrail_rejected'
+        };
+        
         setSessions(prevSessions => 
           prevSessions.map(session => 
             session.id === activeSession 
@@ -208,19 +277,32 @@ const ChatInterface = () => {
               : session
           )
         );
+        
+        return; // Don't continue with normal processing
       }
-
-      // Update session name after first message if it's still default
-      const isFirstMessage = currentSession.messages.length === 0; // No messages before this one
-      console.log('Session name update check:', {
-        isFirstMessage,
-        sessionName: currentSession.name,
-        messageCount: currentSession.messages.length
-      });
       
-      if (isFirstMessage && currentSession.name === 'New Session') {
-        console.log('Updating session name for:', currentSession.sessionId);
-        updateSessionName(currentSession.sessionId, queryText);
+      const assistantMessage = {
+        role: 'assistant',
+        content: response.data.response,
+        query_type: response.data.query_type,
+        metadata: response.data.metadata
+      };
+      
+      setSessions(prevSessions => 
+        prevSessions.map(session => 
+          session.id === activeSession 
+            ? { ...session, messages: [...session.messages, assistantMessage] }
+            : session
+        )
+      );
+
+      // Update session name after first message if it's still default (only if not guardrail rejected)
+      if (!isGuardrailDeleteSession && !isGuardrailRejected) {
+        const isFirstMessage = currentSession.messages.length === 0;
+        
+        if (isFirstMessage && currentSession.name === 'New Session') {
+          updateSessionName(currentSession.sessionId, queryText);
+        }
       }
     } catch (error) {
       const errorMessage = {
@@ -303,7 +385,10 @@ const ChatInterface = () => {
           {sessions.map(session => (
             <div key={session.id} className={`session-item ${activeSession === session.id ? 'active' : ''}`}>
               <button 
-                onClick={() => setActiveSession(session.id)} 
+                onClick={() => {
+                  setActiveSession(session.id);
+                  localStorage.setItem('activeSession', session.id);
+                }} 
                 className="session-button"
               >
                 {session.name}
@@ -370,7 +455,7 @@ const ChatInterface = () => {
               {activeSessionData?.messages.map((message, index) => (
                 <div key={index} className={`message ${message.role}`}>
                   <div className="message-content">
-                    {message.query_type && message.query_type !== 'general' && (
+                    {message.role === 'assistant' && message.query_type && message.query_type !== 'general' && (
                       <div className="message-type-badge">
                         {message.query_type.replace('_', ' ').toUpperCase()}
                       </div>

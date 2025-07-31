@@ -24,13 +24,13 @@ class WebSocketServer:
         
     def initialize(self):
         """Initialize websocket server with event handlers"""
-        logger.info("🔌 Initializing WebSocket server...")
+
         
         @self.socketio.on('connect')
         def handle_connect():
             from flask import request
             client_id = request.sid
-            logger.info(f'Client connected: {client_id}')
+
             with self._lock:
                 self.connected_clients.add(client_id)
             
@@ -38,7 +38,7 @@ class WebSocketServer:
         def handle_disconnect():
             from flask import request
             client_id = request.sid
-            logger.info(f'Client disconnected: {client_id}')
+
             with self._lock:
                 self.connected_clients.discard(client_id)
                 
@@ -48,7 +48,7 @@ class WebSocketServer:
             session_id = data.get('session_id', 'default')
             client_id = request.sid
             
-            logger.info(f'Client {client_id} joining session: {session_id}')
+
             join_room(session_id)
             
             # Register session
@@ -60,8 +60,6 @@ class WebSocketServer:
                 'timestamp': datetime.now().isoformat()
             })
             
-            # Send a test processing update immediately after joining to test the connection
-            logger.info(f"Sending test processing update to session {session_id}")
             self.socketio.emit('processing_update', {
                 'type': 'log',
                 'message': '🧪 Test: WebSocket connection verified after joining',
@@ -72,7 +70,7 @@ class WebSocketServer:
             
 
             
-        logger.info("✅ WebSocket server initialized")
+
     
     def register_session(self, session_id: str, client_id: str = None):
         """Register a new processing session"""
@@ -86,14 +84,14 @@ class WebSocketServer:
                     'last_update': datetime.now(),
                     'message_count': 0
                 }
-                logger.info(f"📝 Registered session: {session_id}")
+
     
     def unregister_session(self, session_id: str):
         """Unregister a completed processing session"""
         with self._lock:
             if session_id in self.active_sessions:
                 del self.active_sessions[session_id]
-                logger.info(f"🗑️ Unregistered session: {session_id}")
+
     
     def emit_log(self, session_id: str, message: str, log_level: str = 'info'):
         """Emit a log message to a specific session"""
@@ -169,7 +167,7 @@ class WebSocketServer:
                     self.active_sessions[session_id]['last_update'] = datetime.now()
                     self.active_sessions[session_id]['message_count'] += 1
             
-            logger.info(f"📡 Emitted {data['type']} to session {session_id}: {data.get('message', '')[:100]}")
+
             
         except Exception as e:
             logger.error(f"❌ Failed to emit update to session {session_id}: {e}")
@@ -195,7 +193,7 @@ class WebSocketServer:
             ]
             
             for session_id in stale_sessions:
-                logger.info(f"🧹 Cleaning up stale session: {session_id}")
+
                 del self.active_sessions[session_id]
     
     def get_connection_count(self) -> int:
@@ -213,7 +211,7 @@ def initialize_websocket_server(socketio: SocketIO) -> WebSocketServer:
     if _websocket_server is None:
         _websocket_server = WebSocketServer(socketio)
         _websocket_server.initialize()
-        logger.info("🚀 WebSocket server initialized globally")
+
     
     return _websocket_server
 

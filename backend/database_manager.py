@@ -57,7 +57,10 @@ class PostgreSQLChatMessageHistory(BaseChatMessageHistory):
     async def _save_message(self, message: BaseMessage):
         """Save message to database."""
         try:
-            await self.db_manager.save_message_to_session(self.session_id, message)
+            query_type = 'general'
+            if hasattr(message, 'additional_kwargs') and isinstance(message.additional_kwargs, dict):
+                query_type = message.additional_kwargs.get('query_type', 'general')
+            await self.db_manager.save_message_to_session(self.session_id, message, query_type)
         except Exception as e:
             logger.error(f"Failed to save message to session {self.session_id}: {e}")
     
@@ -202,7 +205,7 @@ class DatabaseManager:
         """Load messages for a session as LangChain BaseMessage objects."""
         async with self.get_connection() as conn:
             rows = await conn.fetch("""
-                SELECT role, content, metadata, timestamp
+                SELECT role, content, query_type, metadata, timestamp
                 FROM chat_messages
                 WHERE session_id = $1
                 ORDER BY timestamp ASC
@@ -210,33 +213,57 @@ class DatabaseManager:
             
             messages = []
             for row in rows:
-                if row['role'] == 'user':
-                    message = HumanMessage(
-                        content=row['content'],
-                        additional_kwargs=row['metadata'] or {}
-                    )
-                elif row['role'] == 'assistant':
-                    message = AIMessage(
-                        content=row['content'],
-                        additional_kwargs=row['metadata'] or {}
-                    )
-                else:
-                    continue  # Skip system messages for now
-                
-                messages.append(message)
+                try:
+                    # Handle both dict and asyncpg.Record objects
+                    role = row['role']
+                    content = row['content']
+                    query_type = row.get('query_type', 'general')
+                    metadata = row['metadata']
+                    
+                    # Parse metadata if it's a JSON string
+                    if isinstance(metadata, str):
+                        try:
+                            metadata = json.loads(metadata)
+                        except (json.JSONDecodeError, TypeError):
+                            metadata = {}
+                    elif metadata is None:
+                        metadata = {}
+                    
+                    # Add query_type to metadata
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    metadata['query_type'] = query_type
+                    
+                    if role == 'user':
+                        message = HumanMessage(
+                            content=content,
+                            additional_kwargs=metadata
+                        )
+                    elif role == 'assistant':
+                        message = AIMessage(
+                            content=content,
+                            additional_kwargs=metadata
+                        )
+                    else:
+                        continue  # Skip system messages for now
+                    
+                    messages.append(message)
+                except Exception as row_error:
+                    logger.warning(f"Skipping malformed message row: {row_error}")
+                    continue
             
             return messages
     
-    async def save_message_to_session(self, session_id: str, message: BaseMessage):
+    async def save_message_to_session(self, session_id: str, message: BaseMessage, query_type: str = "general"):
         """Save a message to a session."""
         role = 'user' if isinstance(message, HumanMessage) else 'assistant'
         metadata = getattr(message, 'additional_kwargs', {})
         
         async with self.get_connection() as conn:
             await conn.execute("""
-                INSERT INTO chat_messages (session_id, role, content, metadata)
-                VALUES ($1, $2, $3, $4)
-            """, session_id, role, message.content, json.dumps(metadata))
+                INSERT INTO chat_messages (session_id, role, content, query_type, metadata)
+                VALUES ($1, $2, $3, $4, $5)
+            """, session_id, role, message.content, query_type, json.dumps(metadata))
             
             # Update session timestamp
             await conn.execute("""
@@ -275,7 +302,19 @@ class DatabaseManager:
                     ORDER BY s.updated_at DESC
                 """)
             
-            return [dict(row) for row in rows]
+            # Convert asyncpg.Record objects to dictionaries
+            sessions = []
+            for row in rows:
+                session_dict = {
+                    'session_id': row['session_id'],
+                    'tab_id': row['tab_id'], 
+                    'tab_name': row['tab_name'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at'],
+                    'message_count': row['message_count']
+                }
+                sessions.append(session_dict)
+            return sessions
     
     async def delete_session(self, session_id: str) -> bool:
         """Delete a session and all its messages."""

@@ -327,6 +327,51 @@ class QueryProcessor:
             logger.error(f"Document retrieval failed: {e}")
             return []
     
+    async def retrieve_documents_with_tags(self, query: str, keywords: List[str], top_k: int = 5) -> List[SourceDocument]:
+        """Retrieve documents using both semantic search and tag filtering."""
+        if not self._initialized:
+            await self.initialize()
+        
+        try:
+            # Build filter to search BOTH auto-generated keywords AND user custom tags
+            tag_filter = {
+                "$or": [
+                    {"keywords": {"$in": keywords}},        # Auto-generated keywords
+                    {"document_tags": {"$in": keywords}},   # User custom tags
+                    {"service_name": {"$in": keywords}},    # Service names
+                    {"category": {"$in": keywords}}         # Categories
+                ]
+            }
+            
+            # Semantic search with tag filtering
+            docs_with_scores = self.vectorstore.similarity_search_with_score(
+                query, 
+                k=top_k,
+                filter=tag_filter
+            )
+            
+            # Convert to SourceDocument objects
+            source_docs = []
+            for doc, score in docs_with_scores:
+                source_doc = SourceDocument.from_langchain_document(doc, float(score))
+                source_docs.append(source_doc)
+            
+            # Sort by relevance score
+            source_docs.sort(key=lambda x: x.relevance_score, reverse=True)
+            
+            # Fallback to regular retrieval if no results from tag filtering
+            if not source_docs:
+                logger.info(f"No results from tag filtering with keywords: {keywords}, falling back to semantic search")
+                return await self.retrieve_documents(query, top_k)
+            
+            logger.info(f"Retrieved {len(source_docs)} tag-filtered documents using keywords: {keywords}")
+            return source_docs
+            
+        except Exception as e:
+            logger.error(f"Tag-based retrieval failed: {e}")
+            # Fallback to regular retrieval
+            return await self.retrieve_documents(query, top_k)
+    
     async def get_query_embedding(self, query: str) -> List[float]:
         """Get embedding for a query."""
         if not self._initialized:
@@ -406,6 +451,46 @@ class QueryProcessor:
     def get_retriever(self) -> Optional[EnhancedVectorStoreRetriever]:
         """Get the LangChain retriever for use in chains."""
         return self.retriever if self._initialized else None
+    
+    async def extract_keywords_from_query(self, query: str, context: str = "") -> List[str]:
+        """Extract keywords from query for tag-based filtering."""
+        try:
+            # Simple keyword extraction - can be enhanced with NLP
+            aws_services = ['ec2', 'lambda', 's3', 'rds', 'vpc', 'iam', 'cloudwatch', 'elb', 'api gateway', 'dynamodb']
+            tech_terms = ['serverless', 'container', 'kubernetes', 'terraform', 'docker', 'microservice']
+            
+            query_lower = query.lower()
+            context_lower = context.lower()
+            combined_text = f"{query_lower} {context_lower}"
+            
+            keywords = []
+            
+            # Extract AWS services
+            for service in aws_services:
+                if service in combined_text:
+                    keywords.append(service.upper())
+            
+            # Extract tech terms
+            for term in tech_terms:
+                if term in combined_text:
+                    keywords.append(term)
+            
+            # Extract words that might be tags (capitalized words, technical terms)
+            import re
+            words = re.findall(r'\b[A-Z][a-z]+\b|\b[a-z]+(?:-[a-z]+)*\b', query + " " + context)
+            for word in words:
+                if len(word) > 3 and word.lower() not in ['the', 'and', 'for', 'with', 'this', 'that']:
+                    keywords.append(word)
+            
+            # Remove duplicates and limit to 5 keywords
+            keywords = list(set(keywords))[:5]
+            
+            logger.info(f"Extracted keywords from query: {keywords}")
+            return keywords
+            
+        except Exception as e:
+            logger.error(f"Keyword extraction failed: {e}")
+            return []
     
     def get_vectorstore(self) -> Optional[LangChainPinecone]:
         """Get the LangChain vectorstore for direct access."""

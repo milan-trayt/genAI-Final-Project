@@ -27,36 +27,21 @@ class TopicGenerationResponse(BaseModel):
     topic: str
 from rag_service import RAGService, get_rag_service, close_rag_service
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager."""
-    # Startup
-    logger.info("🚀 Starting FastAPI RAG Service...")
     try:
-        # Initialize RAG service
         rag_service = await get_rag_service()
-        logger.info("✅ RAG Service initialized successfully")
         yield
     except Exception as e:
         logger.error(f"Failed to initialize RAG service: {e}")
         raise
     finally:
-        # Shutdown
-        logger.info("🛑 Shutting down FastAPI RAG Service...")
         await close_rag_service()
-        logger.info("✅ Shutdown completed")
 
 
 # Create FastAPI app
@@ -129,16 +114,12 @@ async def one_time_query(
 ):
     """Process a one-time query without conversation history."""
     try:
-        logger.info(f"Processing one-time query: {request.query[:50]}...")
-        
         result = await rag_service.process_one_time_query(
             query=request.query,
             query_type=getattr(request, 'query_type', 'general'),
             top_k=request.top_k
         )
-        
         return QueryResponse(**result)
-        
     except Exception as e:
         logger.error(f"One-time query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Query processing failed: {str(e)}")
@@ -152,11 +133,7 @@ async def conversational_query(
 ):
     """Process a conversational query with session context."""
     try:
-        logger.info(f"Processing conversational query for session {request.session_id}: {request.query[:50]}... (query_type: {getattr(request, 'query_type', 'general')})")
-        
         query_type = getattr(request, 'query_type', 'general')
-        logger.info(f"Calling rag_service.process_conversational_query with query_type: {query_type}")
-        
         result = await rag_service.process_conversational_query(
             query=request.query,
             session_id=request.session_id,
@@ -165,9 +142,6 @@ async def conversational_query(
             top_k=request.top_k
         )
         
-        logger.info(f"Got result from rag_service: {type(result)}")
-        
-        # Ensure all values are serializable
         response_data = {
             "response": str(result["response"]),
             "processing_time": float(result["processing_time"]),
@@ -180,8 +154,6 @@ async def conversational_query(
                 "terraform_code": result.get("terraform_code")
             }
         }
-        
-        logger.info(f"Returning response with query_type: {response_data.get('query_type')}")
         return QueryResponse(**response_data)
         
     except Exception as e:
@@ -197,10 +169,7 @@ async def create_session(
 ):
     """Create a new conversation session."""
     try:
-        logger.info(f"Creating new session: {request.session_name}")
-        
         result = await rag_service.create_session(request.session_name)
-        
         return SessionCreateResponse(**result)
         
     except Exception as e:
@@ -212,10 +181,7 @@ async def create_session(
 async def list_sessions(rag_service: RAGService = Depends(get_rag_service)):
     """List all available sessions."""
     try:
-        logger.info("Listing all sessions")
-        
         result = await rag_service.list_sessions()
-        
         return SessionListResponse(**result)
         
     except Exception as e:
@@ -230,10 +196,7 @@ async def delete_session(
 ):
     """Delete a session."""
     try:
-        logger.info(f"Deleting session: {session_id}")
-        
         success = await rag_service.delete_session(session_id)
-        
         if success:
             return {"message": f"Session {session_id} deleted successfully"}
         else:
@@ -253,10 +216,7 @@ async def generate_topic(
 ):
     """Generate a topic from a query."""
     try:
-        logger.info(f"Generating topic for query: {request.query[:50]}...")
-        
         topic = await rag_service.generate_topic_from_query(request.query)
-        
         return TopicGenerationResponse(topic=topic)
         
     except Exception as e:
@@ -271,10 +231,7 @@ async def get_session_history(
 ):
     """Get conversation history for a session."""
     try:
-        logger.info(f"Getting history for session: {session_id}")
-        
         history = await rag_service.get_session_history(session_id)
-        
         return {"messages": history}
         
     except Exception as e:
@@ -289,7 +246,7 @@ async def ingest_documents(request: dict):
         import subprocess
         import json
         
-        logger.info(f"Starting document ingestion: {request.get('sources', [])}")
+
         
         # Create input file for Python script
         input_data = {
@@ -334,10 +291,7 @@ async def update_session(
 ):
     """Update session name."""
     try:
-        logger.info(f"Updating session {session_id} name to: {request.session_name}")
-        
         success = await rag_service.update_session_name(session_id, request.session_name)
-        
         if success:
             return {"message": "Session updated successfully"}
         else:

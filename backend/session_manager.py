@@ -53,20 +53,36 @@ class HybridChatMessageHistory(BaseChatMessageHistory):
         """Load messages from Redis cache first, then database if needed."""
         try:
             # Try Redis first for speed
-            redis_messages = await self.redis_manager.get_session_messages(self.session_id)
+            try:
+                redis_messages = await self.redis_manager.get_session_messages(self.session_id)
+                if redis_messages and isinstance(redis_messages, list):
+                    self._messages = redis_messages
+                    logger.debug(f"Loaded {len(redis_messages)} messages from Redis cache for session {self.session_id}")
+                    self._loaded = True
+                    return
+            except Exception as redis_error:
+                logger.warning(f"Redis message loading failed for session {self.session_id}: {redis_error}")
             
-            if redis_messages:
-                self._messages = redis_messages
-                logger.debug(f"Loaded {len(redis_messages)} messages from Redis cache for session {self.session_id}")
-            else:
-                # Fallback to database
+            # Fallback to database
+            try:
                 db_messages = await self.db_manager.load_session_messages(self.session_id)
-                self._messages = db_messages
-                
-                # Cache in Redis for future access
-                if db_messages:
-                    await self.redis_manager.save_session_messages(self.session_id, db_messages)
-                    logger.debug(f"Loaded {len(db_messages)} messages from database and cached in Redis for session {self.session_id}")
+                if isinstance(db_messages, list):
+                    self._messages = db_messages
+                    
+                    # Cache in Redis for future access
+                    if db_messages:
+                        try:
+                            await self.redis_manager.save_session_messages(self.session_id, db_messages)
+                        except Exception as cache_error:
+                            logger.warning(f"Failed to cache messages in Redis: {cache_error}")
+                        
+                        logger.debug(f"Loaded {len(db_messages)} messages from database for session {self.session_id}")
+                else:
+                    logger.warning(f"Invalid message format from database for session {self.session_id}")
+                    self._messages = []
+            except Exception as db_error:
+                logger.error(f"Database message loading failed for session {self.session_id}: {db_error}")
+                self._messages = []
             
             self._loaded = True
         except Exception as e:
@@ -251,14 +267,18 @@ class SessionManager:
         else:
             logger.error(f"No history found for session {session_id}")
     
-    async def add_user_message(self, content: str, session_id: str = None):
+    async def add_user_message(self, content: str, session_id: str = None, query_type: str = "general"):
         """Add a user message to the session."""
         message = HumanMessage(content=content)
+        # Store query_type in message metadata
+        message.additional_kwargs = {'query_type': query_type}
         await self.add_message(message, session_id)
     
-    async def add_ai_message(self, content: str, session_id: str = None):
+    async def add_ai_message(self, content: str, session_id: str = None, query_type: str = "general"):
         """Add an AI message to the session."""
         message = AIMessage(content=content)
+        # Store query_type in message metadata
+        message.additional_kwargs = {'query_type': query_type}
         await self.add_message(message, session_id)
     
     async def get_conversation_context(self, session_id: str = None, max_messages: int = 10) -> str:

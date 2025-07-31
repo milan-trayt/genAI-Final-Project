@@ -17,10 +17,14 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     session_id VARCHAR(255) REFERENCES chat_sessions(session_id) ON DELETE CASCADE,
     role VARCHAR(50) NOT NULL CHECK (role IN ('user', 'assistant')),
     content TEXT NOT NULL,
+    query_type VARCHAR(50) DEFAULT 'general',
     sources JSONB,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     metadata JSONB
 );
+
+-- Add query_type column if it doesn't exist (for existing databases)
+ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS query_type VARCHAR(50) DEFAULT 'general';
 
 -- Response cache table for Redis fallback (optional)
 CREATE TABLE IF NOT EXISTS response_cache (

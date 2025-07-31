@@ -176,6 +176,9 @@ class RAGChain:
             for mode, prompt in self.guardrail_prompts.items():
                 self.guardrail_chains[mode] = prompt | self.llm
             
+            # Create keyword extraction chain
+            self.keyword_chain = self.keyword_extraction_prompt | self.llm
+            
             # Create QA chain for one-time queries
             self.qa_chain = RetrievalQA.from_chain_type(
                 llm=self.llm,
@@ -213,100 +216,77 @@ class RAGChain:
         # Mode-specific guardrail prompts
         self.guardrail_prompts = {
             "general": PromptTemplate(
-                template="""You are evaluating a question for AWS/DevOps assistance. Consider the conversation context.
+                template="""Evaluate this question for AWS/DevOps assistance:
 
 {question}
 
-APPROVE if the question is about:
-- AWS services, pricing, or architecture
-- Cloud infrastructure or DevOps
+APPROVE if:
+- About AWS services, pricing, architecture, deployment
+- Cloud infrastructure or DevOps topics
 - Terraform or Infrastructure-as-Code
-- Technical system administration
-- Follow-up questions about previously discussed AWS/technical topics
-- Generic questions that make sense in the context of previous AWS discussions
-- Conversation management ("what did I ask", "previous questions", "history")
-- Meta questions about the chat or assistance
+- Follow-up requests like "give me architecture" or "create solution" when previous context mentions AWS/technical topics
+- Technical questions or conversation management
 
-REJECT only if clearly asking about:
-- Cooking, food, recipes (like "how to make tea")
-- Sports, entertainment, hobbies
+REJECT if:
+- About cooking, food, recipes, sports, entertainment
 - Personal advice, relationships, health
-- Explicitly non-technical topics unrelated to previous context
+- Non-technical topics with no AWS/technical context
 
-If there's previous AWS/technical context, assume follow-up questions are technical.
-
-Respond with exactly "APPROVED" or "REJECTED":
-
-Response:""",
+Respond exactly "APPROVED" or "REJECTED":""",
                 input_variables=["question"]
             ),
             "service_recommendation": PromptTemplate(
-                template="""You are evaluating a question in SERVICE RECOMMENDATION mode. Consider the conversation context.
+                template="""Evaluate this question for AWS service recommendations:
 
 {question}
 
-Look at the conversation history above. 
-
 APPROVE if:
-- The question is directly about AWS services, architecture, or infrastructure
-- There's previous AWS/technical discussion AND the current question is a follow-up (like "final recommendation", "what do you recommend", "best option")
-- The question makes sense in the context of ongoing AWS service discussion
+- About AWS services, architecture, or infrastructure
+- Follow-up requests like "give me architecture" or "recommend services" when previous context mentions AWS/technical topics
+- Contains technical terms or AWS context
 
 REJECT if:
-- Asking about cooking, food, tea, recipes (even if using words like "recommend")
-- Sports, entertainment, personal advice
-- No AWS context exists AND the question is about non-technical topics
+- About cooking, food, recipes, sports, entertainment
+- Non-technical topics with no AWS/technical context
 
-Key rule: Generic recommendation requests are only approved if there's relevant AWS/technical context in the conversation history.
-
-Respond with exactly "APPROVED" or "REJECTED":
-
-Response:""",
+Respond exactly "APPROVED" or "REJECTED":""",
                 input_variables=["question"]
             ),
             "pricing": PromptTemplate(
-                template="""You are evaluating a question in PRICING mode. Consider the conversation context.
+                template="""Evaluate this question for AWS pricing:
 
 {question}
 
-Look at the conversation history above. Check if:
-1. The question is directly about AWS pricing/costs
-2. There's previous AWS discussion that makes this question relevant
-3. The question makes sense in the context of ongoing AWS conversation
+If the question mentions "Previous conversation context: AWS" or contains AWS context, then APPROVE requests for:
+- "create invoice", "pricing invoice", "cost breakdown", "billing estimate"
+- AWS pricing, costs, or billing information
+- Cost optimization for AWS services
 
-APPROVE if:
-- Directly asking for AWS pricing information
-- Follow-up questions when there's previous AWS context (even generic questions like "how much", "create invoice")
-- Questions that relate to previously discussed AWS services
-- Cost optimization requests with AWS context
+Always APPROVE if:
+- About AWS pricing, costs, or billing
+- Invoice/billing requests when AWS/infrastructure context is present
 
-REJECT if:
-- Asking about non-AWS topics (cooking, tea, sports) AND no AWS context exists
-- Completely unrelated questions with no connection to previous AWS discussion
+REJECT only if:
+- About cooking, food, recipes, sports, entertainment with no AWS context
 
-Respond with exactly "APPROVED" or "REJECTED":
-
-Response:""",
+Respond exactly "APPROVED" or "REJECTED":""",
                 input_variables=["question"]
             ),
             "terraform": PromptTemplate(
-                template="""You are evaluating a question in TERRAFORM mode. Consider the conversation context.
+                template="""Evaluate this question for Terraform/Infrastructure:
 
 {question}
 
-Look at the conversation history above. If there's previous discussion about AWS services, infrastructure, or deployment, then follow-up questions like "generate terraform code", "how to deploy this", "create infrastructure" should be APPROVED as they relate to the ongoing technical discussion.
-
 APPROVE if:
-- Directly asking for Terraform code or IaC help
-- Follow-up questions when there's previous infrastructure context
-- Questions that make sense given the conversation history
-- Infrastructure automation or deployment requests
+- About Terraform, Infrastructure-as-Code, or deployment
+- Infrastructure automation requests
+- Follow-up requests like "create terraform" or "deploy this" when previous context mentions AWS/technical topics
 
-REJECT only if clearly unrelated to infrastructure/technical topics AND no relevant context exists.
+REJECT if:
+- About cooking, food, recipes, sports, entertainment
+- Non-technical topics with no infrastructure context
 
-Respond with exactly "APPROVED" or "REJECTED":
-
-Response:""",
+Respond exactly "APPROVED" or "REJECTED":""",
                 input_variables=["question"]
             )
         }
@@ -409,6 +389,21 @@ Use the provided context to answer questions accurately. Always cite your source
             ("human", "{question}"),
             ("system", "Context: {context}")
         ])
+        
+        # Keyword extraction prompt
+        self.keyword_extraction_prompt = PromptTemplate(
+            template="""Extract 3-5 key technical keywords from this query and context for AWS document retrieval.
+
+Query: {query}
+Context: {context}
+
+Focus on: AWS services (EC2, S3, Lambda), technical terms (serverless, container), infrastructure components, specific technologies.
+
+Return keywords that might match both auto-generated keywords and user custom tags.
+
+Keywords (comma-separated):""",
+            input_variables=["query", "context"]
+        )
     
     def _get_mode_prompts(self, query_type: str = "general"):
         """Get appropriate prompts for the given query type."""
@@ -429,18 +424,6 @@ Use the provided context to answer questions accurately. Always cite your source
             # Step 1: Get mode-specific prompts
             mode_prompts = self._get_mode_prompts(query_type)
             
-            # Step 2: Guardrail validation
-            validation_result = await mode_prompts["guardrail"].ainvoke({"question": question})
-            validation_response = validation_result.content.strip().upper()
-            
-            if "REJECTED" in validation_response:
-                return QueryResult(
-                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
-                    sources=[],
-                    processing_time=time.time() - start_time,
-                    cached=False
-                )
-            
             # Step 2: Check semantic cache
             if self.cache_manager:
                 semantic_cache = self.cache_manager.get_semantic_cache()
@@ -457,24 +440,60 @@ Use the provided context to answer questions accurately. Always cite your source
                         query_embedding=query_embedding
                     )
             
-            # Update retriever search parameters
-            self.query_processor.retriever.search_kwargs = {"k": top_k}
-            
-            # Create mode-specific QA chain
-            mode_qa_chain = RetrievalQA.from_chain_type(
-                llm=self.llm,
-                chain_type="stuff",
-                retriever=self.query_processor.get_retriever(),
-                chain_type_kwargs={
-                    "prompt": mode_prompts["qa_prompt"],
-                    "document_variable_name": "context"
-                },
-                return_source_documents=True,
-                callbacks=[self.callback_handler]
-            )
-            
-            # Run mode-specific QA chain
-            result = mode_qa_chain.invoke({"query": question})
+            # Step 3: Extract keywords for tag-based retrieval
+            try:
+                keyword_result = await self.keyword_chain.ainvoke({
+                    "query": question,
+                    "context": ""  # No context for one-shot
+                })
+                keywords = [k.strip() for k in keyword_result.content.split(",") if k.strip()]
+                logger.info(f"Extracted keywords: {keywords}")
+                
+                # Use tag-based retrieval if keywords found, otherwise regular retrieval
+                if keywords:
+                    source_docs = await self.query_processor.retrieve_documents_with_tags(
+                        question, keywords, top_k
+                    )
+                    # Additional fallback check - if tag-based returns empty, try regular
+                    if not source_docs:
+                        logger.info("Tag-based retrieval returned no results, using regular retrieval")
+                        source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                else:
+                    source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                
+                # Create context from retrieved documents
+                context = "\n\n".join([f"Source: {doc.source_path}\n{doc.content}" for doc in source_docs])
+                
+                # Generate response with filtered context
+                prompt_text = mode_prompts["qa_prompt"].format(context=context, question=question)
+                response = await self.llm.ainvoke(prompt_text)
+                
+                final_response = response.content if hasattr(response, 'content') else str(response)
+                
+                result = {
+                    'result': final_response,
+                    'source_documents': []
+                }
+                
+            except Exception as e:
+                logger.warning(f"Keyword extraction failed, using regular retrieval: {e}")
+                # Fallback to regular QA chain
+                self.query_processor.retriever.search_kwargs = {"k": top_k}
+                
+                mode_qa_chain = RetrievalQA.from_chain_type(
+                    llm=self.llm,
+                    chain_type="stuff",
+                    retriever=self.query_processor.get_retriever(),
+                    chain_type_kwargs={
+                        "prompt": mode_prompts["qa_prompt"],
+                        "document_variable_name": "context"
+                    },
+                    return_source_documents=True,
+                    callbacks=[self.callback_handler]
+                )
+                
+                result = mode_qa_chain.invoke({"query": question})
+                source_docs = [SourceDocument.from_langchain_document(doc, doc.metadata.get('relevance_score', 0.0)) for doc in result.get('source_documents', [])]
             
             # Extract response and sources
             response_text = result.get('result', '')
@@ -486,14 +505,18 @@ Use the provided context to answer questions accurately. Always cite your source
             else:
                 final_response = str(response_text)
             
-            # Convert source documents
-            sources = []
-            for doc in source_documents:
-                source = SourceDocument.from_langchain_document(
-                    doc, 
-                    doc.metadata.get('relevance_score', 0.0)
-                )
-                sources.append(source)
+            # Use source_docs from keyword extraction or fallback
+            if 'source_docs' not in locals():
+                source_documents = result.get('source_documents', [])
+                sources = []
+                for doc in source_documents:
+                    source = SourceDocument.from_langchain_document(
+                        doc, 
+                        doc.metadata.get('relevance_score', 0.0)
+                    )
+                    sources.append(source)
+            else:
+                sources = source_docs
             
             processing_time = time.time() - start_time
             
@@ -564,129 +587,209 @@ Use the provided context to answer questions accurately. Always cite your source
             # Step 2: Get mode-specific prompts
             mode_prompts = self._get_mode_prompts(query_type)
             
-            # Add user message to session for all query types
-            await self.session_manager.add_user_message(question, session_id)
-            
-            # Get recent AI messages for context
-            conversation_context = ""
-            if memory and hasattr(memory, 'chat_memory') and memory.chat_memory.messages:
-                # Get only AI messages for context
-                ai_messages = [msg for msg in memory.chat_memory.messages if isinstance(msg, AIMessage)]
-                if ai_messages:
-                    # Get last 2 AI responses with full content
-                    recent_ai_messages = ai_messages[-2:]
-                    context_parts = []
-                    for msg in recent_ai_messages:
-                        context_parts.append(f"Previous AI response: {msg.content}")
-                    conversation_context = "\n\n".join(context_parts)
-                    logger.info(f"AI message context for guardrail: {conversation_context[:500]}...")
-                else:
-                    logger.info("No AI messages available for context")
-                    logger.info(f"Total messages in memory: {len(memory.chat_memory.messages) if memory and hasattr(memory, 'chat_memory') else 0}")
-            else:
-                logger.info("No conversation context available for guardrail")
-            
-            # Create contextual question for guardrail
-            contextual_question = f"""Previous AI responses:
-{conversation_context}
-
-Current question: {question}"""
-            
-            # Guardrail validation with context for ALL modes
-            validation_result = await mode_prompts["guardrail"].ainvoke({"question": contextual_question})
-            validation_response = validation_result.content.strip().upper()
-            
-            logger.info(f"Guardrail validation for '{question}' in {query_type} mode: {validation_response}")
-            
-            if "REJECTED" in validation_response or "REJECT" in validation_response:
-                return QueryResult(
-                    response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
-                    sources=[],
-                    processing_time=time.time() - start_time,
-                    cached=False
-                )
-            
             # Step 3: Process query based on type
             if query_type == "service_recommendation":
-                from rag_service import get_rag_service
-                rag_service = await get_rag_service()
-                result_data = await rag_service._handle_service_recommendation(question, session_id, filters)
-                result = {
-                    "response": result_data["response"],
-                    "processing_time": result_data["processing_time"],
-                    "cached": result_data["cached"],
-                    "sources": []
-                }
+                # Extract keywords from query + topics
+                try:
+                    keyword_result = await self.keyword_chain.ainvoke({
+                        "query": question,
+                        "context": conversation_topics
+                    })
+                    keywords = [k.strip() for k in keyword_result.content.split(",") if k.strip()]
+                    logger.info(f"Extracted keywords for service recommendation: {keywords}")
+                    
+                    # Use tag-based retrieval
+                    if keywords:
+                        source_docs = await self.query_processor.retrieve_documents_with_tags(
+                            question, keywords, top_k
+                        )
+                        if not source_docs:
+                            source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    else:
+                        source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    
+                    # Generate service recommendation response
+                    context = "\n\n".join([f"Source: {doc.source_path}\n{doc.content}" for doc in source_docs])
+                    prompt_text = mode_prompts["qa_prompt"].format(context=context, question=question)
+                    response = await self.llm.ainvoke(prompt_text)
+                    
+                    result = {
+                        "response": response.content if hasattr(response, 'content') else str(response),
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": source_docs
+                    }
+                except Exception as e:
+                    logger.error(f"Service recommendation failed: {e}")
+                    result = {
+                        "response": "Error processing service recommendation request.",
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": []
+                    }
+                    
             elif query_type == "pricing":
-                from rag_service import get_rag_service
-                rag_service = await get_rag_service()
-                result_data = await rag_service._handle_pricing_query(question, session_id)
-                result = {
-                    "response": result_data["response"],
-                    "processing_time": result_data["processing_time"],
-                    "cached": result_data["cached"],
-                    "sources": []
-                }
+                # Extract keywords from query + topics
+                try:
+                    keyword_result = await self.keyword_chain.ainvoke({
+                        "query": question,
+                        "context": conversation_topics
+                    })
+                    keywords = [k.strip() for k in keyword_result.content.split(",") if k.strip()]
+                    logger.info(f"Extracted keywords for pricing: {keywords}")
+                    
+                    # Use tag-based retrieval
+                    if keywords:
+                        source_docs = await self.query_processor.retrieve_documents_with_tags(
+                            question, keywords, top_k
+                        )
+                        if not source_docs:
+                            source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    else:
+                        source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    
+                    # Generate pricing response
+                    context = "\n\n".join([f"Source: {doc.source_path}\n{doc.content}" for doc in source_docs])
+                    prompt_text = mode_prompts["qa_prompt"].format(context=context, question=question)
+                    response = await self.llm.ainvoke(prompt_text)
+                    
+                    result = {
+                        "response": response.content if hasattr(response, 'content') else str(response),
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": source_docs
+                    }
+                except Exception as e:
+                    logger.error(f"Pricing query failed: {e}")
+                    result = {
+                        "response": "Error processing pricing request.",
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": []
+                    }
+                    
             elif query_type == "terraform":
-                from rag_service import get_rag_service
-                rag_service = await get_rag_service()
-                result_data = await rag_service._handle_terraform_query(question, session_id)
-                result = {
-                    "response": result_data["response"],
-                    "processing_time": result_data["processing_time"],
-                    "cached": result_data["cached"],
-                    "sources": []
-                }
+                # Extract keywords from query + topics
+                try:
+                    keyword_result = await self.keyword_chain.ainvoke({
+                        "query": question,
+                        "context": conversation_topics
+                    })
+                    keywords = [k.strip() for k in keyword_result.content.split(",") if k.strip()]
+                    logger.info(f"Extracted keywords for terraform: {keywords}")
+                    
+                    # Use tag-based retrieval
+                    if keywords:
+                        source_docs = await self.query_processor.retrieve_documents_with_tags(
+                            question, keywords, top_k
+                        )
+                        if not source_docs:
+                            source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    else:
+                        source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    
+                    # Generate terraform response
+                    context = "\n\n".join([f"Source: {doc.source_path}\n{doc.content}" for doc in source_docs])
+                    prompt_text = mode_prompts["qa_prompt"].format(context=context, question=question)
+                    response = await self.llm.ainvoke(prompt_text)
+                    
+                    result = {
+                        "response": response.content if hasattr(response, 'content') else str(response),
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": source_docs
+                    }
+                except Exception as e:
+                    logger.error(f"Terraform query failed: {e}")
+                    result = {
+                        "response": "Error processing terraform request.",
+                        "processing_time": time.time() - start_time,
+                        "cached": False,
+                        "sources": []
+                    }
             else:
-                if "REJECTED" in validation_response or "REJECT" in validation_response:
-                    return QueryResult(
-                        response="I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
-                        sources=[],
-                        processing_time=time.time() - start_time,
-                        cached=False
+                
+                # Get conversation topics for keyword extraction (not full content)
+                conversation_context = ""
+                if memory and hasattr(memory, 'chat_memory') and memory.chat_memory.messages:
+                    # Get only topic summaries, not full content
+                    ai_messages = [msg for msg in memory.chat_memory.messages if isinstance(msg, AIMessage)]
+                    if ai_messages:
+                        topics = []
+                        for msg in ai_messages[-2:]:
+                            content_preview = msg.content[:50].replace('\n', ' ')
+                            topics.append(f"Previous: {content_preview}...")
+                        conversation_context = "\n".join(topics)
+                
+                # Extract keywords from query + context
+                try:
+                    keyword_result = await self.keyword_chain.ainvoke({
+                        "query": question,
+                        "context": conversation_context
+                    })
+                    keywords = [k.strip() for k in keyword_result.content.split(",") if k.strip()]
+                    logger.info(f"Extracted keywords for conversational query: {keywords}")
+                    
+                    # Use tag-based retrieval if keywords found, otherwise regular retrieval
+                    if keywords:
+                        source_docs = await self.query_processor.retrieve_documents_with_tags(
+                            question, keywords, top_k
+                        )
+                        # Additional fallback check - if tag-based returns empty, try regular
+                        if not source_docs:
+                            logger.info("Tag-based retrieval returned no results, using regular retrieval")
+                            source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    else:
+                        source_docs = await self.query_processor.retrieve_documents(question, top_k)
+                    
+                    # Get chat history for conversational context
+                    chat_history = []
+                    if memory and hasattr(memory, 'chat_memory'):
+                        messages = memory.chat_memory.messages
+                        for i in range(0, len(messages), 2):
+                            if i + 1 < len(messages):
+                                human_msg = messages[i]
+                                ai_msg = messages[i + 1]
+                                chat_history.append((human_msg.content, ai_msg.content))
+                    
+                    # Create context from retrieved documents
+                    context = "\n\n".join([f"Source: {doc.source_path}\n{doc.content}" for doc in source_docs])
+                    
+                    # Generate response with context and history
+                    prompt_text = self.conversational_prompt.format(
+                        context=context,
+                        chat_history="\n".join([f"Human: {h}\nAssistant: {a}" for h, a in chat_history]),
+                        question=question
                     )
-                
-                # Update retriever search parameters
-                self.query_processor.retriever.search_kwargs = {"k": top_k}
-                
-                # Get chat history BEFORE adding current question (for context)
-                chat_history = []
-                if memory and hasattr(memory, 'chat_memory'):
-                    messages = memory.chat_memory.messages
-                    # Process complete pairs of human/ai messages for context
-                    for i in range(0, len(messages), 2):
-                        if i + 1 < len(messages):
-                            human_msg = messages[i]
-                            ai_msg = messages[i + 1]
-                            chat_history.append((human_msg.content, ai_msg.content))
-                
-                # Add current user message to session AFTER getting history
-                await self.session_manager.add_user_message(question, session_id)
-                
-                # Run conversational chain
-                result = self.conversational_chain.invoke({
-                    "question": question,
-                    "chat_history": chat_history
-                })
-                
-                # Extract response and sources
-                response_text = result.get('answer', '')
-                source_documents = result.get('source_documents', [])
-                
-                # Ensure response is a string
-                if hasattr(response_text, 'content'):
-                    final_response = str(response_text.content)
-                else:
-                    final_response = str(response_text)
-                
-                # Convert source documents
-                sources = []
-                for doc in source_documents:
-                    source = SourceDocument.from_langchain_document(
-                        doc, 
-                        doc.metadata.get('relevance_score', 0.0)
-                    )
-                    sources.append(source)
+                    response = await self.llm.ainvoke(prompt_text)
+                    
+                    final_response = response.content if hasattr(response, 'content') else str(response)
+                    sources = source_docs
+                    
+                except Exception as e:
+                    logger.warning(f"Keyword extraction failed, using regular conversational chain: {e}")
+                    # Fallback to regular conversational chain
+                    self.query_processor.retriever.search_kwargs = {"k": top_k}
+                    
+                    chat_history = []
+                    if memory and hasattr(memory, 'chat_memory'):
+                        messages = memory.chat_memory.messages
+                        for i in range(0, len(messages), 2):
+                            if i + 1 < len(messages):
+                                human_msg = messages[i]
+                                ai_msg = messages[i + 1]
+                                chat_history.append((human_msg.content, ai_msg.content))
+                    
+                    result = self.conversational_chain.invoke({
+                        "question": question,
+                        "chat_history": chat_history
+                    })
+                    
+                    response_text = result.get('answer', '')
+                    final_response = response_text.content if hasattr(response_text, 'content') else str(response_text)
+                    
+                    source_documents = result.get('source_documents', [])
+                    sources = [SourceDocument.from_langchain_document(doc, doc.metadata.get('relevance_score', 0.0)) for doc in source_documents]
                 
                 result = {
                     "response": final_response,

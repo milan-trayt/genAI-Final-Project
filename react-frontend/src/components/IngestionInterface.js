@@ -5,30 +5,56 @@ import { Upload, FileText, Github, Globe, Trash2, Play, CheckCircle, XCircle, Al
 import io from 'socket.io-client';
 
 const IngestionInterface = () => {
-  const [sources, setSources] = useState([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingStep, setProcessingStep] = useState('');
-  const [processingDetails, setProcessingDetails] = useState([]);
-  const [activeTab, setActiveTab] = useState('web');
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
-  const [processingComplete, setProcessingComplete] = useState(false);
+  const [sources, setSources] = useState(() => {
+    const saved = localStorage.getItem('ingestionSources');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [isProcessing, setIsProcessing] = useState(() => {
+    return localStorage.getItem('isProcessing') === 'true';
+  });
+  const [processingStep, setProcessingStep] = useState(() => {
+    return localStorage.getItem('processingStep') || '';
+  });
+  const [processingDetails, setProcessingDetails] = useState(() => {
+    const saved = localStorage.getItem('processingDetails');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('activeTab') || 'web';
+  });
+  const [error, setError] = useState(() => {
+    return localStorage.getItem('processingError') || null;
+  });
+  const [success, setSuccess] = useState(() => {
+    return localStorage.getItem('processingSuccess') === 'true';
+  });
+  const [processingComplete, setProcessingComplete] = useState(() => {
+    return localStorage.getItem('processingComplete') === 'true';
+  });
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [connectionMessage, setConnectionMessage] = useState('');
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   const COLLAB_URL = process.env.REACT_APP_COLLAB_URL || 'http://localhost:8503';
 
 
   const addSource = (source) => {
-    setSources(prevSources => [...prevSources, { ...source, id: Date.now() + Math.random() }]);
+    setSources(prevSources => {
+      const newSources = [...prevSources, { ...source, id: Date.now() + Math.random() }];
+      localStorage.setItem('ingestionSources', JSON.stringify(newSources));
+      return newSources;
+    });
   };
 
   const removeSource = (id) => {
-    setSources(sources.filter(s => s.id !== id));
+    const newSources = sources.filter(s => s.id !== id);
+    setSources(newSources);
+    localStorage.setItem('ingestionSources', JSON.stringify(newSources));
   };
 
   const clearSources = () => {
     setSources([]);
+    localStorage.removeItem('ingestionSources');
   };
 
   const startPollingFallback = async (sessionId) => {
@@ -84,7 +110,15 @@ const IngestionInterface = () => {
     setSuccess(false);
     setProcessingComplete(false);
     
+    localStorage.setItem('isProcessing', 'true');
+    localStorage.setItem('processingDetails', JSON.stringify([]));
+    localStorage.setItem('processingStep', '🔧 Connecting to WebSocket...');
+    localStorage.removeItem('processingError');
+    localStorage.setItem('processingSuccess', 'false');
+    localStorage.setItem('processingComplete', 'false');
+    
     const sessionId = `session_${Date.now()}`;
+    setCurrentSessionId(sessionId);
     
     // Connect to WebSocket with full transport capabilities
     const socket = io(COLLAB_URL, {
@@ -146,6 +180,10 @@ const IngestionInterface = () => {
           docType: source.docType || 'document',
           token: source.token,
           extensions: source.extensions,
+          priority: source.priority,
+          category: source.category,
+          tags: source.tags,
+          customMetadata: source.customMetadata,
           ...source
         }));
         
@@ -174,39 +212,68 @@ const IngestionInterface = () => {
       console.log('🎯 RECEIVED processing_update:', data);
       
       if (data.type === 'log') {
-        setProcessingDetails(prev => [...prev, data.message]);
+        setProcessingDetails(prev => {
+          const newDetails = [...prev, data.message];
+          localStorage.setItem('processingDetails', JSON.stringify(newDetails));
+          return newDetails;
+        });
         setProcessingStep(data.message);
+        localStorage.setItem('processingStep', data.message);
       } else if (data.type === 'progress') {
-        setProcessingDetails(prev => [...prev, data.message]);
+        setProcessingDetails(prev => {
+          const newDetails = [...prev, data.message];
+          localStorage.setItem('processingDetails', JSON.stringify(newDetails));
+          return newDetails;
+        });
         setProcessingStep(data.message);
+        localStorage.setItem('processingStep', data.message);
         // Could add progress bar here if needed
       } else if (data.type === 'complete') {
         // Only mark as complete if this is the final completion (all sources processed)
         if (data.final === true || data.all_complete === true) {
           setIsProcessing(false);
           setProcessingComplete(true);
+          localStorage.setItem('isProcessing', 'false');
+          localStorage.setItem('processingComplete', 'true');
+          
           if (data.status === 'success') {
             setSuccess(true);
             setProcessingStep('🎉 Processing completed successfully!');
+            localStorage.setItem('processingSuccess', 'true');
+            localStorage.setItem('processingStep', '🎉 Processing completed successfully!');
+            
             // Add final stats if available
             if (data.data?.stats) {
               const stats = data.data.stats;
-              setProcessingDetails(prev => [...prev, 
+              const statsDetails = [
                 `📊 Final Statistics:`,
                 `   • Total sources: ${stats.total_sources}`,
                 `   • Processing time: ${stats.processing_time?.toFixed(2)}s`
-              ]);
+              ];
+              setProcessingDetails(prev => {
+                const newDetails = [...prev, ...statsDetails];
+                localStorage.setItem('processingDetails', JSON.stringify(newDetails));
+                return newDetails;
+              });
             }
           } else {
-            setError(data.message || 'Processing failed');
+            const errorMsg = data.message || 'Processing failed';
+            setError(errorMsg);
             setProcessingStep('❌ Processing failed');
+            localStorage.setItem('processingError', errorMsg);
+            localStorage.setItem('processingStep', '❌ Processing failed');
           }
           socket.disconnect();
         } else {
           // Individual source completed, just log it
-          setProcessingDetails(prev => [...prev, data.message || '✅ Source completed']);
+          setProcessingDetails(prev => {
+            const newDetails = [...prev, data.message || '✅ Source completed'];
+            localStorage.setItem('processingDetails', JSON.stringify(newDetails));
+            return newDetails;
+          });
           if (data.message) {
             setProcessingStep(data.message);
+            localStorage.setItem('processingStep', data.message);
           }
         }
       } else if (data.type === 'error') {
@@ -214,8 +281,14 @@ const IngestionInterface = () => {
         setProcessingComplete(true);
         setError(data.message || 'Processing error occurred');
         setProcessingStep('❌ Processing failed');
+        localStorage.setItem('processingError', data.message || 'Processing error occurred');
+        localStorage.setItem('processingStep', '❌ Processing failed');
         if (data.details) {
-          setProcessingDetails(prev => [...prev, `Error details: ${data.details}`]);
+          setProcessingDetails(prev => {
+            const newDetails = [...prev, `Error details: ${data.details}`];
+            localStorage.setItem('processingDetails', JSON.stringify(newDetails));
+            return newDetails;
+          });
         }
         socket.disconnect();
       }
@@ -270,6 +343,28 @@ const IngestionInterface = () => {
     });
   };
 
+  const stopProcessing = async () => {
+    if (!currentSessionId) return;
+    
+    try {
+      await axios.post(`${COLLAB_URL}/api/stop`, {
+        session_id: currentSessionId
+      });
+      setProcessingStep('🛑 Stopping processing...');
+    } catch (error) {
+      console.error('Failed to stop processing:', error);
+    }
+  };
+
+  const clearProcessingData = () => {
+    localStorage.removeItem('isProcessing');
+    localStorage.removeItem('processingStep');
+    localStorage.removeItem('processingDetails');
+    localStorage.removeItem('processingError');
+    localStorage.removeItem('processingSuccess');
+    localStorage.removeItem('processingComplete');
+  };
+
   return (
     <div className="ingestion-interface">
       <div className="ingestion-sidebar">
@@ -278,10 +373,28 @@ const IngestionInterface = () => {
         {sources.length > 0 ? (
           <div className="sources-list">
             {sources.map(source => (
-              <div key={source.id} className="source-item">
+              <div key={source.id} className={`source-item priority-${source.priority || 'medium'}`}>
                 <div className="source-info">
                   <span className="source-type">{source.type.toUpperCase()}</span>
-                  <span className="source-name">{source.name}</span>
+                  <div className="source-details">
+                    <span className="source-path" title={source.path}>
+                      {source.type === 'web' ? new URL(source.path).hostname : source.path}
+                    </span>
+                    {(source.priority || source.category || source.tags?.length > 0) && (
+                      <div className="source-metadata">
+                        {source.priority && <span className="metadata-tag">📊 {source.priority}</span>}
+                        {source.category && <span className="metadata-tag">📁 {source.category}</span>}
+                        {source.tags?.length > 0 && (
+                          source.tags.slice(0,2).map((tag, i) => (
+                            <span key={i} className="metadata-tag">🏷️ {tag}</span>
+                          ))
+                        )}
+                        {source.tags?.length > 2 && (
+                          <span className="metadata-tag more-tags" title={`Additional tags: ${source.tags.slice(2).join(', ')}`}>+{source.tags.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <button 
                   onClick={() => removeSource(source.id)}
@@ -317,21 +430,48 @@ const IngestionInterface = () => {
               connectionStatus={connectionStatus}
               connectionMessage={connectionMessage}
             />
-            {processingComplete && (
-              <div className="processing-actions">
-                <button 
-                  onClick={() => {
-                    setProcessingComplete(false);
-                    setSuccess(false);
-                    setError(null);
-                    setProcessingStep('');
-                    setProcessingDetails([]);
-                  }}
-                  className="back-to-ingestion"
-                >
-                  ← Back to Ingestion
-                </button>
-                {success && (
+            <div className="processing-actions">
+              {isProcessing && (
+                <>
+                  <button 
+                    onClick={stopProcessing}
+                    className="stop-processing"
+                  >
+                    🛑 Stop Processing
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setIsProcessing(false);
+                      setProcessingComplete(true);
+                      setError('Processing force stopped');
+                      setProcessingStep('🛑 Force stopped');
+                      setCurrentSessionId(null);
+                      clearProcessingData();
+                    }}
+                    className="force-reset"
+                    title="Force reset if processing is stuck"
+                  >
+                    🔄 Force Reset
+                  </button>
+                </>
+              )}
+              {processingComplete && (
+                <>
+                  <button 
+                    onClick={() => {
+                      setProcessingComplete(false);
+                      setSuccess(false);
+                      setError(null);
+                      setProcessingStep('');
+                      setProcessingDetails([]);
+                      setCurrentSessionId(null);
+                      setIsProcessing(false);
+                      clearProcessingData();
+                    }}
+                    className="back-to-ingestion"
+                  >
+                    ← Back to Ingestion
+                  </button>
                   <button 
                     onClick={() => {
                       setSources([]);
@@ -339,33 +479,46 @@ const IngestionInterface = () => {
                       setSuccess(false);
                       setProcessingStep('');
                       setProcessingDetails([]);
+                      setCurrentSessionId(null);
+                      setIsProcessing(false);
+                      localStorage.removeItem('ingestionSources');
+                      clearProcessingData();
                     }}
                     className="clear-and-continue"
                   >
-                    Clear Sources & Continue
+                    {success ? '🎉 Clear Sources & Add More' : '🗑️ Clear Sources & Retry'}
                   </button>
-                )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </>
         ) : (
           <>
             <div className="ingestion-tabs">
               <button 
                 className={activeTab === 'web' ? 'active' : ''}
-                onClick={() => setActiveTab('web')}
+                onClick={() => {
+                  setActiveTab('web');
+                  localStorage.setItem('activeTab', 'web');
+                }}
               >
                 <Globe size={16} /> Web
               </button>
               <button 
                 className={activeTab === 'github' ? 'active' : ''}
-                onClick={() => setActiveTab('github')}
+                onClick={() => {
+                  setActiveTab('github');
+                  localStorage.setItem('activeTab', 'github');
+                }}
               >
                 <Github size={16} /> GitHub
               </button>
               <button 
                 className={activeTab === 'files' ? 'active' : ''}
-                onClick={() => setActiveTab('files')}
+                onClick={() => {
+                  setActiveTab('files');
+                  localStorage.setItem('activeTab', 'files');
+                }}
               >
                 <Upload size={16} /> Files
               </button>
@@ -463,9 +616,11 @@ const ProcessingStatus = ({ step, details, error, success, isProcessing, connect
 const WebTab = ({ addSource }) => {
   const [urls, setUrls] = useState('');
   const [docType, setDocType] = useState('web_documentation');
+  const [pendingSources, setPendingSources] = useState([]);
   const [addError, setAddError] = useState('');
+  const [bulkTags, setBulkTags] = useState('');
 
-  const handleSubmit = () => {
+  const handlePreview = () => {
     setAddError('');
     const urlList = urls.split('\n').filter(url => url.trim());
     
@@ -477,24 +632,61 @@ const WebTab = ({ addSource }) => {
     // Validate URLs
     const invalidUrls = urlList.filter(url => !url.match(/^https?:\/\/.+/));
     if (invalidUrls.length > 0) {
-      setAddError(`Invalid URLs: ${invalidUrls.join(', ')}`);
+      setAddError('Invalid URLs found');
       return;
     }
     
-    // Add each URL as a separate source with unique IDs
-    urlList.forEach((url, index) => {
-      setTimeout(() => {
-        addSource({
-          type: 'web',
-          name: `${url.split('/').pop() || url} (${index + 1})`,
-          path: url.trim(),
-          docType: docType || 'web_documentation'
-        });
-      }, index * 10); // Small delay to ensure unique timestamps
-    });
+    const newPending = urlList.map((url, index) => ({
+      id: Date.now() + index,
+      url: url.trim(),
+      name: url.split('/').pop() || url,
+      priority: 'medium',
+      category: 'general',
+      tags: ''
+    }));
     
+    setPendingSources(prev => [...prev, ...newPending]);
     setUrls('');
-    setDocType('web_documentation');
+  };
+  
+  const updatePendingSource = (id, field, value) => {
+    setPendingSources(prev => prev.map(source => 
+      source.id === id ? { ...source, [field]: value } : source
+    ));
+  };
+  
+  const removePendingSource = (id) => {
+    setPendingSources(prev => prev.filter(source => source.id !== id));
+  };
+  
+  const addPendingSources = () => {
+    pendingSources.forEach((source, index) => {
+      let combinedTags = source.tags;
+      if (bulkTags.trim()) {
+        if (combinedTags.trim()) {
+          combinedTags = combinedTags.endsWith(',') ? combinedTags + bulkTags : combinedTags + ',' + bulkTags;
+        } else {
+          combinedTags = bulkTags;
+        }
+      }
+      const tags = combinedTags.split(',').map(tag => tag.trim()).filter(Boolean);
+      addSource({
+        type: 'web',
+        name: `${source.name} (${index + 1})`,
+        path: source.url,
+        docType: docType || 'web_documentation',
+        priority: source.priority,
+        category: source.category,
+        tags: tags,
+        customMetadata: {
+          source_priority: source.priority,
+          document_category: source.category,
+          document_tags: tags,
+          ingestion_date: new Date().toISOString()
+        }
+      });
+    });
+    setPendingSources([]);
   };
 
   return (
@@ -518,9 +710,98 @@ const WebTab = ({ addSource }) => {
         onChange={(e) => setDocType(e.target.value)}
         placeholder="Document type (e.g., web_documentation, api_docs)"
       />
-      <button onClick={handleSubmit} disabled={!urls.trim()}>
-        Add Web Sources ({urls.split('\n').filter(url => url.trim()).length} URLs)
+      <button onClick={handlePreview} disabled={!urls.trim()}>
+        Preview Sources ({urls.split('\n').filter(url => url.trim()).length} URLs)
       </button>
+      
+      {pendingSources.length > 0 && (
+        <div className="pending-sources">
+          <h4>📝 Set Metadata for Web Sources:</h4>
+          <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Sources:</h5>
+            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+              <select 
+                key={`web-priority-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingSources(prev => prev.map(source => ({...source, priority: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Priority for All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select 
+                key={`web-category-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingSources(prev => prev.map(source => ({...source, category: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Category for All</option>
+                <option value="general">General</option>
+                <option value="aws-docs">AWS Docs</option>
+                <option value="terraform">Terraform</option>
+                <option value="pricing">Pricing</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Common tags for all (comma-separated)"
+                value={bulkTags}
+                onChange={(e) => setBulkTags(e.target.value)}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd', minWidth: '200px'}}
+              />
+            </div>
+          </div>
+          {pendingSources.map(source => (
+            <div key={source.id} className="pending-source">
+              <div className="source-info">
+                <div className="source-url-display">
+                  <span className="source-domain">{new URL(source.url).hostname}</span>
+                  <span className="source-path">{new URL(source.url).pathname}</span>
+                </div>
+                <span className="source-type">WEB</span>
+              </div>
+              <div className="source-metadata">
+                <select 
+                  value={source.priority} 
+                  onChange={(e) => updatePendingSource(source.id, 'priority', e.target.value)}
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select 
+                  value={source.category} 
+                  onChange={(e) => updatePendingSource(source.id, 'category', e.target.value)}
+                >
+                  <option value="general">General</option>
+                  <option value="aws-docs">AWS Docs</option>
+                  <option value="terraform">Terraform</option>
+                  <option value="pricing">Pricing</option>
+                  <option value="api-docs">API Docs</option>
+                  <option value="tutorials">Tutorials</option>
+                </select>
+                <input
+                  type="text"
+                  value={source.tags}
+                  onChange={(e) => updatePendingSource(source.id, 'tags', e.target.value)}
+                  placeholder="Tags (comma-separated)"
+                />
+                <button onClick={() => removePendingSource(source.id)} className="remove-source">✕</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={addPendingSources} className="add-pending-sources">
+            Add {pendingSources.length} Web Sources
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -529,9 +810,11 @@ const GitHubTab = ({ addSource }) => {
   const [repos, setRepos] = useState('');
   const [token, setToken] = useState('');
   const [extensions, setExtensions] = useState('.py,.js,.ts,.md,.yml,.yaml,.json');
+  const [pendingSources, setPendingSources] = useState([]);
   const [addError, setAddError] = useState('');
+  const [bulkTags, setBulkTags] = useState('');
 
-  const handleSubmit = () => {
+  const handlePreview = () => {
     setAddError('');
     const repoList = repos.split('\n').filter(repo => repo.trim());
     
@@ -543,25 +826,63 @@ const GitHubTab = ({ addSource }) => {
     // Validate repo format
     const invalidRepos = repoList.filter(repo => !repo.match(/^[\w.-]+\/[\w.-]+$/));
     if (invalidRepos.length > 0) {
-      setAddError(`Invalid repository format: ${invalidRepos.join(', ')}. Use format: owner/repo`);
+      setAddError('Invalid repository format. Use format: owner/repo');
       return;
     }
     
-    // Add each repo as a separate source with unique IDs
-    repoList.forEach((repo, index) => {
-      setTimeout(() => {
-        addSource({
-          type: 'github',
-          name: `${repo} (${index + 1})`,
-          path: repo.trim(),
-          token: token || null,
-          extensions: extensions ? extensions.split(',').map(ext => ext.trim()).filter(Boolean) : []
-        });
-      }, index * 10); // Small delay to ensure unique timestamps
-    });
+    const newPending = repoList.map((repo, index) => ({
+      id: Date.now() + index,
+      repo: repo.trim(),
+      name: repo,
+      priority: 'medium',
+      category: 'code',
+      tags: ''
+    }));
     
+    setPendingSources(prev => [...prev, ...newPending]);
     setRepos('');
-    setToken('');
+  };
+  
+  const updatePendingSource = (id, field, value) => {
+    setPendingSources(prev => prev.map(source => 
+      source.id === id ? { ...source, [field]: value } : source
+    ));
+  };
+  
+  const removePendingSource = (id) => {
+    setPendingSources(prev => prev.filter(source => source.id !== id));
+  };
+  
+  const addPendingSources = () => {
+    pendingSources.forEach((source, index) => {
+      let combinedTags = source.tags;
+      if (bulkTags.trim()) {
+        if (combinedTags.trim()) {
+          combinedTags = combinedTags.endsWith(',') ? combinedTags + bulkTags : combinedTags + ',' + bulkTags;
+        } else {
+          combinedTags = bulkTags;
+        }
+      }
+      const tags = combinedTags.split(',').map(tag => tag.trim()).filter(Boolean);
+      addSource({
+        type: 'github',
+        name: `${source.name} (${index + 1})`,
+        path: source.repo,
+        token: token || null,
+        extensions: extensions ? extensions.split(',').map(ext => ext.trim()).filter(Boolean) : [],
+        priority: source.priority,
+        category: source.category,
+        tags: tags,
+        customMetadata: {
+          source_priority: source.priority,
+          document_category: source.category,
+          document_tags: tags,
+          repository_type: 'github',
+          ingestion_date: new Date().toISOString()
+        }
+      });
+    });
+    setPendingSources([]);
   };
 
   return (
@@ -591,62 +912,252 @@ const GitHubTab = ({ addSource }) => {
         onChange={(e) => setExtensions(e.target.value)}
         placeholder="File extensions (e.g., .py,.js,.md)"
       />
-      <button onClick={handleSubmit} disabled={!repos.trim()}>
-        Add GitHub Sources ({repos.split('\n').filter(repo => repo.trim()).length} repos)
+      <button onClick={handlePreview} disabled={!repos.trim()}>
+        Preview Sources ({repos.split('\n').filter(repo => repo.trim()).length} repos)
       </button>
+      
+      {pendingSources.length > 0 && (
+        <div className="pending-sources">
+          <h4>📝 Set Metadata for GitHub Sources:</h4>
+          <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Sources:</h5>
+            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+              <select 
+                key={`github-priority-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingSources(prev => prev.map(source => ({...source, priority: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Priority for All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select 
+                key={`github-category-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingSources(prev => prev.map(source => ({...source, category: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Category for All</option>
+                <option value="general">General</option>
+                <option value="aws-docs">AWS Docs</option>
+                <option value="terraform">Terraform</option>
+                <option value="pricing">Pricing</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Common tags for all (comma-separated)"
+                value={bulkTags}
+                onChange={(e) => setBulkTags(e.target.value)}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd', minWidth: '200px'}}
+              />
+            </div>
+          </div>
+          {pendingSources.map(source => (
+            <div key={source.id} className="pending-source">
+              <div className="source-info">
+                <span className="source-name">{source.repo}</span>
+                <span className="source-type">GITHUB</span>
+              </div>
+              <div className="source-metadata">
+                <select 
+                  value={source.priority} 
+                  onChange={(e) => updatePendingSource(source.id, 'priority', e.target.value)}
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select 
+                  value={source.category} 
+                  onChange={(e) => updatePendingSource(source.id, 'category', e.target.value)}
+                >
+                  <option value="general">General</option>
+                  <option value="aws-docs">AWS Docs</option>
+                  <option value="terraform">Terraform</option>
+                  <option value="pricing">Pricing</option>
+                  <option value="api-docs">API Docs</option>
+                  <option value="tutorials">Tutorials</option>
+                </select>
+                <input
+                  type="text"
+                  value={source.tags}
+                  onChange={(e) => updatePendingSource(source.id, 'tags', e.target.value)}
+                  placeholder="Tags (comma-separated)"
+                />
+                <button onClick={() => removePendingSource(source.id)} className="remove-source">✕</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={addPendingSources} className="add-pending-sources">
+            Add {pendingSources.length} GitHub Sources
+          </button>
+        </div>
+      )}
     </div>
   );
 };
 
 const FilesTab = ({ addSource, collabUrl }) => {
   const [uploading, setUploading] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [filePaths, setFilePaths] = useState('');
+  const [docType, setDocType] = useState('');
+  const [addError, setAddError] = useState('');
+  const [bulkTags, setBulkTags] = useState('');
   
   const onDrop = useCallback(async (acceptedFiles) => {
     setUploading(true);
+    setAddError('');
+    const newPendingFiles = [];
+    const failedUploads = [];
     
     for (let i = 0; i < acceptedFiles.length; i++) {
       const file = acceptedFiles[i];
       
       try {
+        console.log('Uploading file:', file.name, 'Size:', file.size, 'Type:', file.type);
+        
         const formData = new FormData();
         formData.append('file', file);
         
         const uploadResponse = await axios.post(`${collabUrl}/api/upload`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`Upload progress for ${file.name}: ${percentCompleted}%`);
           }
         });
         
         if (uploadResponse.data.status === 'success') {
-          addSource({
-            type: file.type.includes('pdf') ? 'pdf' : 'csv',
+          newPendingFiles.push({
+            id: Date.now() + i,
             name: file.name,
             path: uploadResponse.data.filepath,
+            type: file.type.includes('pdf') ? 'pdf' : 'csv',
+            priority: 'medium',
+            category: '',
+            tags: '',
             uploaded: true
           });
+        } else {
+          failedUploads.push(file.name);
         }
       } catch (error) {
         console.error('Upload failed for', file.name, error);
+        if (error.code === 'ECONNABORTED') {
+          failedUploads.push(`${file.name} (timeout)`);
+        } else {
+          failedUploads.push(`${file.name} (${error.message})`);
+        }
       }
     }
     
+    if (failedUploads.length > 0) {
+      setAddError(`Failed to upload: ${failedUploads.join(', ')}`);
+    }
+    
+    setPendingFiles(prev => [...prev, ...newPendingFiles]);
     setUploading(false);
-  }, [addSource, collabUrl]);
+  }, [collabUrl]);
+
+  const handlePreview = () => {
+    setAddError('');
+    const pathList = filePaths.split('\n').filter(path => path.trim());
+    
+    if (pathList.length === 0) {
+      setAddError('Please enter at least one file path');
+      return;
+    }
+    
+    const newPending = pathList.map((filePath, index) => {
+      const fileName = filePath.split('/').pop();
+      const fileType = fileName.split('.').pop().toLowerCase();
+      
+      return {
+        id: Date.now() + index + 1000,
+        path: filePath.trim(),
+        name: fileName,
+        type: fileType === 'pdf' ? 'pdf' : 'csv',
+        priority: 'medium',
+        category: 'document',
+        tags: '',
+        uploaded: false
+      };
+    });
+    
+    setPendingFiles(prev => [...prev, ...newPending]);
+    setFilePaths('');
+  };
+  
+  const updatePendingFile = (id, field, value) => {
+    setPendingFiles(prev => prev.map(file => 
+      file.id === id ? { ...file, [field]: value } : file
+    ));
+  };
+  
+  const removePendingFile = (id) => {
+    setPendingFiles(prev => prev.filter(file => file.id !== id));
+  };
+  
+  const addPendingFiles = () => {
+    pendingFiles.forEach((file, index) => {
+      let combinedTags = file.tags;
+      if (bulkTags.trim()) {
+        if (combinedTags.trim()) {
+          combinedTags = combinedTags.endsWith(',') ? combinedTags + bulkTags : combinedTags + ',' + bulkTags;
+        } else {
+          combinedTags = bulkTags;
+        }
+      }
+      const tags = combinedTags.split(',').map(tag => tag.trim()).filter(Boolean);
+      addSource({
+        type: file.type,
+        name: file.name,
+        path: file.path,
+        docType: docType || `${file.type}_document`,
+        priority: file.priority,
+        category: file.category || 'document',
+        tags: tags,
+        uploaded: file.uploaded,
+        customMetadata: {
+          source_priority: file.priority,
+          document_category: file.category || 'document',
+          document_tags: tags,
+          file_type: file.type,
+          ingestion_date: new Date().toISOString()
+        }
+      });
+    });
+    setPendingFiles([]);
+  };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf'],
-      'text/csv': ['.csv']
+      'text/csv': ['.csv'],
+      'text/plain': ['.csv']
     },
     disabled: uploading,
-    noClick: false,
-    noKeyboard: false
+    multiple: true
   });
 
   return (
     <div className="files-tab">
       <h3>📁 File Upload</h3>
+      {addError && (
+        <div className="error-message">
+          <AlertCircle size={16} />
+          <span>{addError}</span>
+        </div>
+      )}
       <div {...getRootProps()} className={`dropzone ${isDragActive ? 'active' : ''} ${uploading ? 'uploading' : ''}`}>
         <input {...getInputProps()} />
         <FileText size={48} />
@@ -661,73 +1172,119 @@ const FilesTab = ({ addSource, collabUrl }) => {
       
       <div className="file-path-section">
         <h4>Or enter file paths for large files:</h4>
-        <FilePathInput addSource={addSource} />
-      </div>
-    </div>
-  );
-};
-
-const FilePathInput = ({ addSource }) => {
-  const [filePaths, setFilePaths] = useState('');
-  const [docType, setDocType] = useState('');
-  const [addError, setAddError] = useState('');
-
-  const handleSubmit = () => {
-    setAddError('');
-    const pathList = filePaths.split('\n').filter(path => path.trim());
-    
-    if (pathList.length === 0) {
-      setAddError('Please enter at least one file path');
-      return;
-    }
-    
-    // Add each file path as a separate source with unique IDs
-    pathList.forEach((filePath, index) => {
-      setTimeout(() => {
-        const fileName = filePath.split('/').pop();
-        const fileType = fileName.split('.').pop().toLowerCase();
-        
-        addSource({
-          type: fileType === 'pdf' ? 'pdf' : 'csv',
-          name: `${fileName} (${index + 1})`,
-          path: filePath.trim(),
-          docType: docType || `${fileType}_document`
-        });
-      }, index * 10); // Small delay to ensure unique timestamps
-    });
-    
-    setFilePaths('');
-    setDocType('');
-  };
-
-  return (
-    <div className="file-path-input">
-      {addError && (
-        <div className="error-message">
-          <AlertCircle size={16} />
-          <span>{addError}</span>
-        </div>
-      )}
-      <textarea
-        value={filePaths}
-        onChange={(e) => setFilePaths(e.target.value)}
-        placeholder="Enter file paths (one per line)&#10;/workspace/data/large_file.csv&#10;/workspace/docs/manual.pdf"
-        rows={3}
-      />
-      <div className="file-path-actions">
+        {addError && (
+          <div className="error-message">
+            <AlertCircle size={16} />
+            <span>{addError}</span>
+          </div>
+        )}
+        <textarea
+          value={filePaths}
+          onChange={(e) => setFilePaths(e.target.value)}
+          placeholder="Enter file paths (one per line)&#10;/workspace/data/large_file.csv&#10;/workspace/docs/manual.pdf"
+          rows={3}
+        />
         <input
           type="text"
           value={docType}
           onChange={(e) => setDocType(e.target.value)}
           placeholder="Document type (optional)"
         />
-        <button onClick={handleSubmit} disabled={!filePaths.trim()}>
-          Add from Paths ({filePaths.split('\n').filter(path => path.trim()).length} files)
+        <button onClick={handlePreview} disabled={!filePaths.trim()}>
+          Preview Files ({filePaths.split('\n').filter(path => path.trim()).length})
         </button>
       </div>
+      
+      {pendingFiles.length > 0 && (
+        <div className="pending-files">
+          <h4>📝 Set Metadata for Files:</h4>
+          <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Files:</h5>
+            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
+              <select 
+                key={`files-priority-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingFiles(prev => prev.map(file => ({...file, priority: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Priority for All</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <select 
+                key={`files-category-${Date.now()}`}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setPendingFiles(prev => prev.map(file => ({...file, category: e.target.value})));
+                  }
+                }}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd'}}
+              >
+                <option value="">Set Category for All</option>
+                <option value="general">General</option>
+                <option value="aws-docs">AWS Docs</option>
+                <option value="terraform">Terraform</option>
+                <option value="pricing">Pricing</option>
+              </select>
+              <input
+                type="text"
+                placeholder="Common tags for all (comma-separated)"
+                value={bulkTags}
+                onChange={(e) => setBulkTags(e.target.value)}
+                style={{padding: '5px', borderRadius: '3px', border: '1px solid #ddd', minWidth: '200px'}}
+              />
+            </div>
+          </div>
+          {pendingFiles.map(file => (
+            <div key={file.id} className="pending-file">
+              <div className="file-info">
+                <span className="file-name">{file.uploaded ? file.name : file.path}</span>
+                <span className="file-type">{file.type.toUpperCase()}</span>
+              </div>
+              <div className="file-metadata">
+                <select 
+                  value={file.priority} 
+                  onChange={(e) => updatePendingFile(file.id, 'priority', e.target.value)}
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+                <select 
+                  value={file.category} 
+                  onChange={(e) => updatePendingFile(file.id, 'category', e.target.value)}
+                >
+                  <option value="general">General</option>
+                  <option value="aws-docs">AWS Docs</option>
+                  <option value="terraform">Terraform</option>
+                  <option value="pricing">Pricing</option>
+                  <option value="api-docs">API Docs</option>
+                  <option value="tutorials">Tutorials</option>
+                </select>
+                <input
+                  type="text"
+                  value={file.tags}
+                  onChange={(e) => updatePendingFile(file.id, 'tags', e.target.value)}
+                  placeholder="Tags (comma-separated)"
+                />
+                <button onClick={() => removePendingFile(file.id)} className="remove-file">✕</button>
+              </div>
+            </div>
+          ))}
+          <button onClick={addPendingFiles} className="add-pending-files">
+            Add {pendingFiles.length} Files to Sources
+          </button>
+        </div>
+      )}
     </div>
   );
 };
+
+
 
 
 

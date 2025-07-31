@@ -16,7 +16,7 @@ from rag_chain import RAGChain, get_rag_chain
 from cache_manager import CacheManager, get_cache_manager
 from error_handler import ErrorHandler, get_error_handler
 from aws_service_recommender import AWSServiceRecommender
-from semantic_chunker import SemanticDocumentChunker
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class RAGService:
         self.rag_chain: Optional[RAGChain] = None
         self.cache_manager: Optional[CacheManager] = None
         self.aws_recommender: Optional[AWSServiceRecommender] = None
-        self.semantic_chunker = SemanticDocumentChunker()
+
         
         self._initialized = False
     
@@ -46,14 +46,9 @@ class RAGService:
             return True
         
         try:
-            logger.info("🚀 Initializing RAG Service...")
-            
-            # Initialize infrastructure components
             self.database_manager = await get_database_manager()
             self.redis_manager = await get_redis_manager()
             self.cache_manager = await get_cache_manager()
-            
-            # Initialize core RAG components
             self.query_processor = await get_query_processor()
             self.session_manager = await get_session_manager()
             self.rag_chain = await get_rag_chain(
@@ -61,15 +56,11 @@ class RAGService:
                 self.session_manager,
                 self.cache_manager
             )
-            
-            # Initialize AWS recommender
             self.aws_recommender = AWSServiceRecommender(
                 llm=self.rag_chain.llm,
                 retriever=self.query_processor.get_retriever()
             )
-            
             self._initialized = True
-            logger.info("✅ RAG Service initialized successfully")
             return True
             
         except Exception as e:
@@ -82,7 +73,10 @@ class RAGService:
             await self.initialize()
         
         try:
-
+            # Apply guardrail validation for ALL query types
+            guardrail_result = await self._validate_query_with_guardrail(query, None, query_type)
+            if guardrail_result:
+                return guardrail_result
             
             if not self.rag_chain:
                 await self.initialize()
@@ -105,10 +99,13 @@ class RAGService:
             await self.initialize()
         
         try:
-            # Save user message ONCE at the beginning for ALL query types
+            # Apply guardrail validation for ALL query types
+            guardrail_result = await self._validate_query_with_guardrail(query, session_id, query_type)
+            if guardrail_result:
+                return guardrail_result
+            
             try:
-                await self.session_manager.add_user_message(query, session_id)
-                logger.info(f"Saved user message to session {session_id}: {query[:50]}...")
+                await self.session_manager.add_user_message(query, session_id, query_type)
             except Exception as e:
                 logger.error(f"Failed to save user message: {e}")
             
@@ -120,8 +117,6 @@ class RAGService:
             elif query_type == "terraform":
                 result = await self._handle_terraform_query(query, session_id)
             else:
-
-                
                 if not self.rag_chain:
                     await self.initialize()
                 result = await self.rag_chain.query_conversational(query, session_id, query_type, top_k)
@@ -139,33 +134,127 @@ class RAGService:
             logger.error(f"Conversational query failed: {e}")
             raise
     
+    async def _validate_query_with_guardrail(self, query: str, session_id: Optional[str], query_type: str) -> Optional[Dict[str, Any]]:
+        """Validate query with guardrail for all query types."""
+        try:
+            if not self.rag_chain:
+                await self.initialize()
+            
+            # Get mode-specific guardrail prompt
+            mode_prompts = self.rag_chain._get_mode_prompts(query_type)
+            
+            # Get conversation context if session exists
+            conversation_topics = ""
+            if session_id and self.session_manager:
+                try:
+                    # Ensure session is loaded first
+                    await self.session_manager.load_session(session_id)
+                    await self.session_manager.ensure_messages_loaded(session_id)
+                    
+                    memory = self.session_manager.get_memory(session_id)
+                    if memory and hasattr(memory, 'chat_memory') and memory.chat_memory.messages:
+                        from langchain.schema import AIMessage, HumanMessage
+                        recent_messages = memory.chat_memory.messages[-6:]  # Last 3 exchanges
+                        
+                        aws_keywords = ['aws', 'lambda', 'ec2', 's3', 'rds', 'vpc', 'terraform', 'infrastructure', 'cloud', 'deploy', 'architecture', 'cost', 'minimal function', 'pricing', 'invoice', 'billing', 'estimate', 'service recommendation', 'dynamodb', 'api gateway', 'cloudwatch']
+                        
+                        logger.info(f"Checking {len(recent_messages)} recent messages for AWS context")
+                        for i, msg in enumerate(recent_messages):
+                            if isinstance(msg, (HumanMessage, AIMessage)):
+                                content_lower = msg.content.lower()
+                                logger.info(f"Message {i}: {content_lower[:100]}...")
+                                if any(keyword in content_lower for keyword in aws_keywords):
+                                    conversation_topics = "AWS/Infrastructure discussion with service recommendations and pricing context"
+                                    logger.info(f"Found AWS context in message {i}")
+                                    break
+                        
+                        if conversation_topics:
+                            logger.info(f"Context detected: {conversation_topics}")
+                        else:
+                            logger.info("No AWS context found in recent messages")
+                except Exception as e:
+                    logger.warning(f"Could not get conversation context for guardrail: {e}")
+            
+            # Create contextual input for guardrail
+            if conversation_topics:
+                contextual_input = f"""Previous conversation context: {conversation_topics}
+
+Current question: {query}"""
+            else:
+                contextual_input = query
+            
+            # Guardrail validation
+            validation_result = await mode_prompts["guardrail"].ainvoke({"question": contextual_input})
+            validation_response = validation_result.content.strip().upper()
+            
+            logger.info(f"Guardrail validation for '{query}' in {query_type} mode with context '{conversation_topics}': {validation_response}")
+            
+            if "REJECTED" in validation_response or "REJECT" in validation_response:
+                # Handle session cleanup for first message rejection
+                response_prefix = "GUARDRAIL_REJECTED:"
+                if session_id and self.session_manager:
+                    try:
+                        memory = self.session_manager.get_memory(session_id)
+                        is_first_message = False
+                        if memory and hasattr(memory, 'chat_memory'):
+                            is_first_message = len(memory.chat_memory.messages) == 0
+                        
+                        if is_first_message:
+                            await self.session_manager.delete_session(session_id)
+                            logger.info(f"Session {session_id} removed due to guardrail rejection on first message")
+                            response_prefix = "GUARDRAIL_REJECTED_DELETE:"
+                    except Exception as e:
+                        logger.error(f"Failed to check/remove session {session_id}: {e}")
+                
+                # Mode-specific rejection messages
+                rejection_messages = {
+                    "general": "I can only help with AWS cloud infrastructure, DevOps, and software development topics. Please ask about AWS services, pricing, architecture, or technical questions.",
+                    "service_recommendation": "I can only provide AWS service recommendations and architecture guidance. Please ask about AWS services, infrastructure design, or technical solutions.",
+                    "pricing": "I can only help with AWS pricing, cost optimization, and billing questions. Please ask about AWS costs, pricing estimates, or cost-effective solutions.",
+                    "terraform": "I can only help with Terraform, Infrastructure-as-Code, and AWS deployment automation. Please ask about Terraform configurations or infrastructure deployment."
+                }
+                
+                rejection_message = rejection_messages.get(query_type, rejection_messages["general"])
+                
+                return {
+                    "response": f"{response_prefix} {rejection_message}",
+                    "processing_time": 0.1,
+                    "cached": False,
+                    "query_type": query_type,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            return None  # Query passed guardrail validation
+            
+        except Exception as e:
+            logger.error(f"Guardrail validation failed: {e}")
+            return {
+                "response": "I apologize, but I encountered an error processing your request. Please try again.",
+                "processing_time": 0.1,
+                "cached": False,
+                "query_type": query_type,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+    
     async def _handle_service_recommendation(self, query: str, session_id: str, filters: Optional[Dict] = None) -> Dict[str, Any]:
         """Handle service recommendation queries with CoT reasoning"""
         try:
-            logger.info(f"Service recommendation handler called for query: {query[:50]}...")
+
             
-            # User message already saved at top level
-            
-            # Get conversation context from session
             conversation_context = ""
             try:
                 history = await self.get_session_history(session_id)
                 if history:
-                    # Get last few AI messages for context
                     ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
                     if ai_messages:
-                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        recent_messages = ai_messages[-2:]
                         context_parts = [msg['content'] for msg in recent_messages]
                         conversation_context = "\n\n".join(context_parts)
-                        logger.info(f"Using conversation context: {conversation_context[:200]}...")
             except Exception as e:
                 logger.warning(f"Could not get conversation context: {e}")
             
             recommendation = await self.aws_recommender.recommend_services(query, filters, conversation_context)
-            logger.info(f"AWS recommender returned: {type(recommendation)} - {str(recommendation)[:200]}...")
-            
             if "error" in recommendation:
-                logger.info(f"Service recommendation error: {recommendation['error']}")
                 return {
                     "response": str(recommendation["error"]),
                     "processing_time": 0.5,
@@ -188,14 +277,10 @@ class RAGService:
         
         # No need for complex formatting since LLM returns formatted response directly
         
-        # Save the response to session
         try:
-            await self.session_manager.add_ai_message(str(response), session_id)
-            logger.info(f"Saved service recommendation response to session {session_id}")
+            await self.session_manager.add_ai_message(str(response), session_id, "service_recommendation")
         except Exception as e:
             logger.error(f"Failed to save response to session: {e}")
-        
-        logger.info(f"Formatted response length: {len(response)} chars")
         
         return {
             "response": str(response),
@@ -208,20 +293,15 @@ class RAGService:
     async def _handle_pricing_query(self, query: str, session_id: str) -> Dict[str, Any]:
         """Handle pricing estimation queries"""
         try:
-            # User message already saved at top level
-            
-            # Get conversation context from session
             conversation_context = ""
             try:
                 history = await self.get_session_history(session_id)
                 if history:
-                    # Get last few AI messages for context
                     ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
                     if ai_messages:
-                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        recent_messages = ai_messages[-2:]
                         context_parts = [msg['content'] for msg in recent_messages]
                         conversation_context = "\n\n".join(context_parts)
-                        logger.info(f"Using conversation context for pricing: {conversation_context[:200]}...")
             except Exception as e:
                 logger.warning(f"Could not get conversation context: {e}")
             
@@ -243,10 +323,8 @@ class RAGService:
             # Use the direct response from the LLM
             response = pricing.get("response", "No pricing information available")
             
-            # Save the response to session
             try:
-                await self.session_manager.add_ai_message(str(response), session_id)
-                logger.info(f"Saved pricing response to session {session_id}")
+                await self.session_manager.add_ai_message(str(response), session_id, "pricing")
             except Exception as e:
                 logger.error(f"Failed to save response to session: {e}")
             
@@ -270,20 +348,15 @@ class RAGService:
     async def _handle_terraform_query(self, query: str, session_id: str) -> Dict[str, Any]:
         """Handle Terraform code generation queries"""
         try:
-            # User message already saved at top level
-            
-            # Get conversation context from session
             conversation_context = ""
             try:
                 history = await self.get_session_history(session_id)
                 if history:
-                    # Get last few AI messages for context
                     ai_messages = [msg for msg in history if msg.get('role') == 'assistant']
                     if ai_messages:
-                        recent_messages = ai_messages[-2:]  # Last 2 AI responses
+                        recent_messages = ai_messages[-2:]
                         context_parts = [msg['content'] for msg in recent_messages]
                         conversation_context = "\n\n".join(context_parts)
-                        logger.info(f"Using conversation context for terraform: {conversation_context[:200]}...")
             except Exception as e:
                 logger.warning(f"Could not get conversation context: {e}")
             
@@ -295,10 +368,8 @@ class RAGService:
             # Use the direct response from the LLM
             response = terraform_result.get("response", "No Terraform code available")
             
-            # Save the response to session
             try:
-                await self.session_manager.add_ai_message(str(response), session_id)
-                logger.info(f"Saved terraform response to session {session_id}")
+                await self.session_manager.add_ai_message(str(response), session_id, "terraform")
             except Exception as e:
                 logger.error(f"Failed to save response to session: {e}")
             
@@ -437,12 +508,18 @@ class RAGService:
             
             session_info = []
             for session in sessions:
+                # Handle both dict and asyncpg.Record objects
+                if hasattr(session, 'get'):
+                    session_data = session
+                else:
+                    session_data = dict(session)
+                
                 session_info.append({
-                    "session_id": session["session_id"],
-                    "session_name": session.get("tab_name", "Unnamed Session"),
-                    "created_at": session["created_at"],
-                    "updated_at": session["updated_at"],
-                    "message_count": session.get("message_count", 0)
+                    "session_id": session_data["session_id"],
+                    "session_name": session_data.get("tab_name", "Unnamed Session"),
+                    "created_at": session_data["created_at"],
+                    "updated_at": session_data["updated_at"],
+                    "message_count": session_data.get("message_count", 0)
                 })
             
             return {
@@ -488,13 +565,24 @@ class RAGService:
             # Convert messages to API format
             messages = []
             for message in history.messages:
-                role = "user" if message.__class__.__name__ == "HumanMessage" else "assistant"
-                content = message.content if hasattr(message, 'content') else str(message)
-                messages.append({
-                    "role": role,
-                    "content": content,
-                    "timestamp": datetime.utcnow().isoformat()
-                })
+                try:
+                    role = "user" if message.__class__.__name__ == "HumanMessage" else "assistant"
+                    content = message.content if hasattr(message, 'content') else str(message)
+                    
+                    # Get query_type from additional_kwargs metadata
+                    query_type = 'general'
+                    if hasattr(message, 'additional_kwargs') and isinstance(message.additional_kwargs, dict):
+                        query_type = message.additional_kwargs.get('query_type', 'general')
+                    
+                    messages.append({
+                        "role": role,
+                        "content": content,
+                        "query_type": query_type,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                except Exception as msg_error:
+                    logger.warning(f"Skipping malformed message: {msg_error}")
+                    continue
             
             return messages
             
@@ -609,7 +697,6 @@ class RAGService:
                 await self.database_manager.close()
             
             self._initialized = False
-            logger.info("✅ RAG Service closed successfully")
             
         except Exception as e:
             logger.error(f"Error during service shutdown: {e}")

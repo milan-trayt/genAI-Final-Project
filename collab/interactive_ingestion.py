@@ -10,6 +10,7 @@ import openai
 import uuid
 import requests
 import time
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -49,12 +50,32 @@ class WorkingOpenAIEmbeddings:
         return response.data[0].embedding
     
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        """Embed multiple documents"""
-        embeddings = []
-        for text in texts:
-            embedding = self.embed_query(text)
-            embeddings.append(embedding)
-        return embeddings
+        """Embed multiple documents in batches"""
+        batch_size = 100  # OpenAI allows up to 2048 inputs per request
+        all_embeddings = []
+        
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i:i + batch_size]
+            try:
+                response = self.client.embeddings.create(
+                    model=self.model,
+                    input=batch
+                )
+                batch_embeddings = [data.embedding for data in response.data]
+                all_embeddings.extend(batch_embeddings)
+            except Exception as e:
+                print(f"Error processing batch {i//batch_size + 1}: {e}")
+                # Fallback to individual processing for this batch
+                for text in batch:
+                    try:
+                        embedding = self.embed_query(text)
+                        all_embeddings.append(embedding)
+                    except Exception as text_error:
+                        print(f"Error processing individual text: {text_error}")
+                        # Add zero vector as fallback
+                        all_embeddings.append([0.0] * 1536)
+        
+        return all_embeddings
 
 class WorkingOpenAIChat:
     """Custom OpenAI chat wrapper that bypasses LangChain's client issues"""
@@ -96,14 +117,7 @@ class InteractiveRAGIngestion:
         self.llm = None
         self.index = None
         
-        print("\n" + "=" * 60)
-        print("🤖 GenAI DevOps Assistant - RAG Ingestion Pipeline")
-        print("📚 Working OpenAI + Pinecone Document Processing")
-        print("=" * 60)
-        print(f"Environment: {self.config.environment.value}")
-        print(f"OpenAI Model: {self.config.openai.embedding_model}")
-        print(f"Pinecone Index: {self.config.pinecone.index_name}")
-        print("=" * 60)
+
         
         # Initialize RAG pipeline
         self.initialize_pipeline()
@@ -111,19 +125,10 @@ class InteractiveRAGIngestion:
     def initialize_pipeline(self):
         """Initialize the RAG pipeline."""
         try:
-            print("\n🔧 Initializing RAG pipeline...")
-            
-            # Initialize working OpenAI components
             self.embeddings = WorkingOpenAIEmbeddings()
             self.llm = WorkingOpenAIChat()
-            
-            # Test embeddings
             test_embedding = self.embeddings.embed_query("test")
-            print(f"✅ OpenAI embeddings working (dimension: {len(test_embedding)})")
-            
-            # Test LLM
             test_response = self.llm.invoke("Say 'Hello'")
-            print(f"✅ OpenAI chat working (response: {test_response})")
             
             # Initialize Pinecone
             from pinecone import Pinecone, ServerlessSpec
@@ -134,7 +139,6 @@ class InteractiveRAGIngestion:
             existing_indexes = [index.name for index in pc.list_indexes()]
             
             if index_name not in existing_indexes:
-                print(f"Creating Pinecone index: {index_name}")
                 pc.create_index(
                     name=index_name,
                     dimension=1536,
@@ -143,61 +147,41 @@ class InteractiveRAGIngestion:
                 )
                 import time
                 time.sleep(10)
-            
             self.index = pc.Index(index_name)
-            print("✅ Pinecone index ready")
-            
-            print("✅ Pipeline initialized successfully!")
-            self.display_index_stats()
                 
         except Exception as e:
-            print(f"❌ Error initializing pipeline: {e}")
-            import traceback
-            traceback.print_exc()
-            print("❌ Failed to initialize. Please check your configuration.")
+            print(f"Error initializing pipeline: {e}")
             exit(1)
     
     def process_documents(self, session_id: str = "default"):
         """Process all added document sources."""
         if not self.document_sources:
             msg = "No document sources added. Please add sources first."
-            print(f"\n❌ {msg}")
             send_processing_update(session_id, "error", msg)
             return
         
-        start_time = time.time()  # Track processing start time
+        start_time = time.time()
         msg = f"Processing {len(self.document_sources)} document sources..."
-        print(f"\n🔄 {msg}")
         send_processing_update(session_id, "start", msg, {"total_sources": len(self.document_sources)})
         
         try:
             from langchain.text_splitter import RecursiveCharacterTextSplitter
             from langchain.schema import Document
-            
-            # Optimize chunk size based on source type
-            if any(s.source_type == 'csv' for s in self.document_sources):
-                chunk_size = 1500
-                chunk_overlap = 50
-            elif any(s.source_type == 'github_codebase' for s in self.document_sources):
-                chunk_size = 800
-                chunk_overlap = 100
-            else:
-                chunk_size = self.ingestion_config.chunk_size
-                chunk_overlap = self.ingestion_config.chunk_overlap
-            
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=chunk_size,
-                chunk_overlap=chunk_overlap
-            )
+            import re
             
             all_documents = []
             sources_to_remove = []
             
             # Load documents from all sources
             for i, source in enumerate(self.document_sources):
+                # Check stop flag
+                if hasattr(self, 'should_stop') and self.should_stop:
+                    msg = "🛑 Processing stopped by user"
+                    send_processing_update(session_id, "stopped", msg)
+                    return
+                
                 try:
                     msg = f"Processing: {source.source_type} - {source.source_path}"
-                    print(f"\n📄 {msg}")
                     send_processing_update(session_id, "source_processing", msg, {
                         "source_index": i + 1,
                         "total_sources": len(self.document_sources),
@@ -210,41 +194,45 @@ class InteractiveRAGIngestion:
                         all_documents.extend(docs)
                         sources_to_remove.append(source)
                         msg = f"Loaded {len(docs)} documents"
-                        print(f"✅ {msg}")
                         send_processing_update(session_id, "source_complete", msg, {"documents_loaded": len(docs)})
                     else:
                         msg = "No documents loaded from this source"
-                        print(f"⚠️ {msg}")
                         send_processing_update(session_id, "warning", msg)
                 except Exception as e:
                     msg = f"Error loading from {source.source_path}: {e}"
-                    print(f"❌ {msg}")
                     send_processing_update(session_id, "error", msg)
                     continue
             
             if not all_documents:
                 msg = "No documents loaded from any source"
-                print(f"\n❌ {msg}")
                 send_processing_update(session_id, "error", msg)
                 return
             
-            msg = f"Splitting {len(all_documents)} documents into chunks..."
-            print(f"\n📝 {msg}")
+            # Check stop flag before chunking
+            if hasattr(self, 'should_stop') and self.should_stop:
+                msg = "🛑 Processing stopped by user"
+                send_processing_update(session_id, "stopped", msg)
+                return
+            
+            msg = f"Smart chunking {len(all_documents)} documents..."
             send_processing_update(session_id, "chunking", msg, {"total_documents": len(all_documents)})
             
-            texts = text_splitter.split_documents(all_documents)
-            msg = f"Created {len(texts)} text chunks"
-            print(f"✅ {msg}")
+            texts = self._smart_chunk_documents(all_documents)
+            msg = f"Created {len(texts)} smart chunks"
             send_processing_update(session_id, "chunking_complete", msg, {"total_chunks": len(texts)})
             
+            # Check stop flag before embeddings
+            if hasattr(self, 'should_stop') and self.should_stop:
+                msg = "🛑 Processing stopped by user"
+                send_processing_update(session_id, "stopped", msg)
+                return
+            
             msg = "Creating embeddings and storing in Pinecone..."
-            print(f"\n🔗 {msg}")
             send_processing_update(session_id, "embedding_start", msg)
             
             text_contents = [doc.page_content for doc in texts]
             
             msg = f"Creating embeddings for {len(text_contents)} chunks..."
-            print(f"  {msg}")
             send_processing_update(session_id, "embedding_progress", msg, {"total_chunks": len(text_contents)})
             
             embeddings = self.embeddings.embed_documents(text_contents)
@@ -252,6 +240,7 @@ class InteractiveRAGIngestion:
             vectors_to_upsert = []
             for i, (doc, embedding) in enumerate(zip(texts, embeddings)):
                 try:
+                    
                     filtered_metadata = self._filter_metadata(doc.metadata)
                     filtered_metadata['text'] = doc.page_content
                     
@@ -263,14 +252,12 @@ class InteractiveRAGIngestion:
                     
                     if (i + 1) % 100 == 0:
                         msg = f"Processed {i + 1}/{len(texts)} chunks"
-                        print(f"  {msg}")
                         send_processing_update(session_id, "embedding_progress", msg, {
                             "processed": i + 1,
                             "total": len(texts)
                         })
                         
                 except Exception as e:
-                    print(f"❌ Error processing chunk {i}: {e}")
                     continue
             
             if vectors_to_upsert:
@@ -282,14 +269,12 @@ class InteractiveRAGIngestion:
                     self.index.upsert(vectors=batch)
                     batch_num = i // batch_size + 1
                     msg = f"Uploaded batch {batch_num}/{total_batches}"
-                    print(f"  {msg}")
                     send_processing_update(session_id, "upload_progress", msg, {
                         "batch": batch_num,
                         "total_batches": total_batches
                     })
                 
                 msg = f"Successfully processed and stored {len(vectors_to_upsert)} document chunks!"
-                print(f"\n✅ {msg}")
                 
                 self.processing_stats.documents_loaded = len(all_documents)
                 self.processing_stats.chunks_created = len(texts)
@@ -306,26 +291,16 @@ class InteractiveRAGIngestion:
                     }
                 })
                 
-                # Remove successfully processed sources
                 for source in sources_to_remove:
                     if source in self.document_sources:
                         self.document_sources.remove(source)
-                if sources_to_remove:
-                    print(f"✅ Removed {len(sources_to_remove)} successfully processed sources")
-                
-                self.display_processing_stats()
-                self.display_index_stats()
             else:
                 msg = "No valid chunks created for storage"
-                print(f"\n❌ {msg}")
                 send_processing_update(session_id, "error", msg)
                 
         except Exception as e:
             msg = f"Error during processing: {e}"
-            print(f"\n❌ {msg}")
             send_processing_update(session_id, "error", msg)
-            import traceback
-            traceback.print_exc()
     
     def _filter_metadata(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
         """Filter metadata to keep only serializable values"""
@@ -370,7 +345,12 @@ class InteractiveRAGIngestion:
         """Load PDF documents"""
         from langchain_community.document_loaders import PyPDFLoader
         loader = PyPDFLoader(source.source_path)
-        return loader.load()
+        docs = loader.load()
+        
+        for doc in docs:
+            doc.metadata.update(source.metadata)
+        
+        return docs
     
     def _load_web_documents(self, source: DocumentSource) -> List:
         """Load web documents with JavaScript support"""
@@ -386,7 +366,6 @@ class InteractiveRAGIngestion:
             browser = metadata.get('browser', 'chrome')
             
             if use_selenium:
-                print(f"  Using Selenium loader for JavaScript-heavy content...")
                 
                 # Use the compatible wrapper for single URLs
                 if isinstance(source.source_path, str):
@@ -414,10 +393,6 @@ class InteractiveRAGIngestion:
                         return loader.load_urls(urls)
                         
                 except Exception as selenium_error:
-                    print(f"  Enhanced Selenium loader failed: {selenium_error}")
-                    print(f"  Trying compatible Selenium loader...")
-                    
-                    # Fallback to compatible loader
                     try:
                         compatible_loader = CompatibleSeleniumLoader(
                             urls=urls,
@@ -427,24 +402,28 @@ class InteractiveRAGIngestion:
                         )
                         return compatible_loader.load()
                     except Exception as compatible_error:
-                        print(f"  Compatible Selenium loader failed: {compatible_error}")
-                        print(f"  Falling back to basic WebBaseLoader...")
+                        pass
             
             # Fallback to basic web loader
             from langchain_community.document_loaders import WebBaseLoader
-            print(f"  Using basic WebBaseLoader...")
             loader = WebBaseLoader(source.source_path)
-            return loader.load()
+            docs = loader.load()
+            
+            # Add source metadata to each document
+            for doc in docs:
+                doc.metadata.update(source.metadata)
+            
+            return docs
             
         except Exception as e:
-            print(f"  Error in web document loading: {e}")
-            # Final fallback
             try:
                 from langchain_community.document_loaders import WebBaseLoader
                 loader = WebBaseLoader(source.source_path)
-                return loader.load()
+                docs = loader.load()
+                for doc in docs:
+                    doc.metadata.update(source.metadata)
+                return docs
             except Exception as final_error:
-                print(f"  Final fallback failed: {final_error}")
                 return []
     
     def _load_github_documents(self, source: DocumentSource) -> List:
@@ -456,7 +435,13 @@ class InteractiveRAGIngestion:
             access_token=metadata.get('access_token'),
             include_prs=metadata.get('include_prs', True)
         )
-        return loader.load()
+        docs = loader.load()
+        
+        # Add source metadata to each document
+        for doc in docs:
+            doc.metadata.update(source.metadata)
+        
+        return docs
     
     def _load_github_codebase_documents(self, source: DocumentSource) -> List:
         """Load GitHub codebase files using GithubFileLoader"""
@@ -476,7 +461,11 @@ class InteractiveRAGIngestion:
                 file_filter=lambda file_path: any(file_path.endswith(ext) for ext in file_extensions)
             )
             documents = loader.load()
-            print(f"✅ Loaded {len(documents)} files from GitHub repository (main branch)")
+            
+            # Add source metadata to each document
+            for doc in documents:
+                doc.metadata.update(source.metadata)
+            
             return documents
         except Exception:
             # Try master branch if main fails
@@ -489,10 +478,13 @@ class InteractiveRAGIngestion:
                     file_filter=lambda file_path: any(file_path.endswith(ext) for ext in file_extensions)
                 )
                 documents = loader.load()
-                print(f"✅ Loaded {len(documents)} files from GitHub repository (master branch)")
+                
+                # Add source metadata to each document
+                for doc in documents:
+                    doc.metadata.update(source.metadata)
+                
                 return documents
             except Exception as e:
-                print(f"❌ Error loading GitHub repository: {e}")
                 raise e
     
 
@@ -509,7 +501,13 @@ class InteractiveRAGIngestion:
             page_ids=metadata.get('page_ids'),
             space_key=metadata.get('space_key')
         )
-        return loader.load()
+        docs = loader.load()
+        
+        # Add source metadata to each document
+        for doc in docs:
+            doc.metadata.update(source.metadata)
+        
+        return docs
     
     def _load_csv_documents(self, source: DocumentSource) -> List:
         """Load large CSV documents in chunks"""
@@ -525,30 +523,32 @@ class InteractiveRAGIngestion:
                 # Convert chunk to string representation
                 chunk_content = chunk_df.to_string(index=False)
                 
+                doc_metadata = {
+                    'source_type': 'csv',
+                    'source_path': source.source_path,
+                    'chunk_number': chunk_num,
+                    'rows_count': len(chunk_df),
+                    'columns': list(chunk_df.columns)
+                }
+                doc_metadata.update(source.metadata)
+                
                 doc = Document(
                     page_content=chunk_content,
-                    metadata={
-                        'source_type': 'csv',
-                        'source_path': source.source_path,
-                        'chunk_number': chunk_num,
-                        'rows_count': len(chunk_df),
-                        'columns': list(chunk_df.columns)
-                    }
+                    metadata=doc_metadata
                 )
                 documents.append(doc)
                 
-                # Progress feedback
                 if (chunk_num + 1) % 10 == 0:
-                    print(f"  Processed {(chunk_num + 1) * chunk_size} rows...")
+                    pass
                     
         except Exception as e:
-            print(f"Error processing CSV: {e}")
-            # Fallback to original loader for smaller files
             from langchain_community.document_loaders import CSVLoader
             loader = CSVLoader(file_path=source.source_path)
-            return loader.load()
+            docs = loader.load()
+            for doc in docs:
+                doc.metadata.update(source.metadata)
+            return docs
         
-        print(f"✅ Processed {len(documents)} chunks from CSV file")
         return documents
     
     def test_search(self):
@@ -605,25 +605,428 @@ Answer:"""
         try:
             if self.index:
                 stats = self.index.describe_index_stats()
-                print(f"\n📊 Current index stats:")
-                print(f"   Total vectors: {stats.get('total_vector_count', 0)}")
-                print(f"   Dimension: {stats.get('dimension', 1536)}")
-                print(f"   Index fullness: {stats.get('index_fullness', 0):.2%}")
-                if stats.get('namespaces'):
-                    print(f"   Namespaces: {list(stats['namespaces'].keys())}")
-            else:
-                print("\n❌ Index not initialized")
         except Exception as e:
-            print(f"\n❌ Error getting index stats: {e}")
+            pass
+    
+    def _smart_chunk_documents(self, documents: List) -> List:
+        """Smart chunking based on category with intelligent chunking strategies"""
+        chunked_docs = []
+        
+        for doc in documents:
+            # Get category from custom metadata
+            category = doc.metadata.get('document_category', 'general')
+            source_type = doc.metadata.get('source_type', '')
+            
+            if category == 'terraform':
+                chunks = self._chunk_terraform_doc(doc)
+            elif category == 'aws-docs':
+                chunks = self._chunk_aws_doc(doc)
+            elif category == 'pricing':
+                chunks = self._chunk_pricing_doc(doc)
+            elif category == 'api-docs':
+                chunks = self._chunk_api_doc(doc)
+            elif category == 'tutorials':
+                chunks = self._chunk_tutorials_doc(doc)
+            elif source_type == 'csv':
+                chunks = self._chunk_csv_doc(doc)
+            elif source_type == 'github_codebase':
+                chunks = self._chunk_code_doc(doc)
+            else:
+                chunks = self._chunk_generic_doc(doc)
+            
+            chunked_docs.extend(chunks)
+        
+        return chunked_docs
+    
+    def _chunk_terraform_doc(self, doc) -> List:
+        """Chunk Terraform preserving complete blocks, combining small ones"""
+        content = doc.page_content
+        
+        # Extract all Terraform blocks (resource, data, module, variable, output)
+        block_patterns = [
+            r'(resource\s+"[^"]+"\s+"[^"]+"\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})',
+            r'(data\s+"[^"]+"\s+"[^"]+"\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})',
+            r'(module\s+"[^"]+"\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})',
+            r'(variable\s+"[^"]+"\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})',
+            r'(output\s+"[^"]+"\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})',
+            r'(locals\s*\{[^}]*(?:\{[^}]*\}[^}]*)*\})'
+        ]
+        
+        all_blocks = []
+        for pattern in block_patterns:
+            blocks = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
+            all_blocks.extend(blocks)
+        
+        chunks = []
+        current_chunk = []
+        current_size = 0
+        max_chunk_size = 1200
+        
+        for block in all_blocks:
+            block_size = len(block)
+            
+            # If block is large, create its own chunk
+            if block_size > max_chunk_size:
+                # First, flush current chunk if it has content
+                if current_chunk:
+                    from langchain.schema import Document
+                    chunk_doc = Document(
+                        page_content='\n\n'.join(current_chunk),
+                        metadata={**doc.metadata, 'chunk_type': 'terraform_combined'}
+                    )
+                    chunks.append(chunk_doc)
+                    current_chunk = []
+                    current_size = 0
+                
+                # Create chunk for large block
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content=block,
+                    metadata={
+                        **doc.metadata,
+                        'chunk_type': 'terraform_block',
+                        'block_type': self._extract_terraform_block_type(block)
+                    }
+                )
+                chunks.append(chunk_doc)
+            
+            # If adding this block would exceed limit, flush current chunk
+            elif current_size + block_size > max_chunk_size and current_chunk:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content='\n\n'.join(current_chunk),
+                    metadata={**doc.metadata, 'chunk_type': 'terraform_combined'}
+                )
+                chunks.append(chunk_doc)
+                current_chunk = [block]
+                current_size = block_size
+            
+            # Add to current chunk
+            else:
+                current_chunk.append(block)
+                current_size += block_size
+        
+        # Flush remaining chunk
+        if current_chunk:
+            from langchain.schema import Document
+            chunk_doc = Document(
+                page_content='\n\n'.join(current_chunk),
+                metadata={**doc.metadata, 'chunk_type': 'terraform_combined'}
+            )
+            chunks.append(chunk_doc)
+        
+        return chunks if chunks else self._chunk_generic_doc(doc)
+    
+    def _chunk_aws_doc(self, doc) -> List:
+        """Chunk AWS docs by service features and concepts"""
+        content = doc.page_content
+        chunks = []
+        
+        # Split by AWS-specific patterns
+        aws_patterns = [
+            r'(## [^\n]*(?:Overview|Introduction)[^\n]*\n.*?)(?=## |$)',
+            r'(## [^\n]*(?:Getting [Ss]tarted|Quick [Ss]tart)[^\n]*\n.*?)(?=## |$)',
+            r'(## [^\n]*(?:Features?|Capabilities)[^\n]*\n.*?)(?=## |$)',
+            r'(## [^\n]*(?:Pricing|Cost)[^\n]*\n.*?)(?=## |$)',
+            r'(## [^\n]*(?:Security|IAM|Permissions)[^\n]*\n.*?)(?=## |$)'
+        ]
+        
+        found_sections = []
+        for pattern in aws_patterns:
+            sections = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
+            found_sections.extend(sections)
+        
+        if found_sections:
+            for section in found_sections:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content=section,
+                    metadata={**doc.metadata, 'chunk_type': 'aws_feature_section'}
+                )
+                chunks.append(chunk_doc)
+        else:
+            # Split by paragraphs for AWS docs
+            paragraphs = content.split('\n\n')
+            current_chunk = []
+            current_size = 0
+            
+            for para in paragraphs:
+                if current_size + len(para) > 800 and current_chunk:
+                    from langchain.schema import Document
+                    chunk_doc = Document(
+                        page_content='\n\n'.join(current_chunk),
+                        metadata={**doc.metadata, 'chunk_type': 'aws_paragraph'}
+                    )
+                    chunks.append(chunk_doc)
+                    current_chunk = [para]
+                    current_size = len(para)
+                else:
+                    current_chunk.append(para)
+                    current_size += len(para)
+            
+            if current_chunk:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content='\n\n'.join(current_chunk),
+                    metadata={**doc.metadata, 'chunk_type': 'aws_paragraph'}
+                )
+                chunks.append(chunk_doc)
+        
+        return chunks
+    
+    def _chunk_csv_doc(self, doc) -> List:
+        """Chunk CSV with larger chunks"""
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1500,
+            chunk_overlap=50
+        )
+        chunks = splitter.split_text(doc.page_content)
+        from langchain.schema import Document
+        return [
+            Document(
+                page_content=chunk,
+                metadata={**doc.metadata, 'chunk_type': 'csv_data'}
+            )
+            for chunk in chunks
+        ]
+    
+    def _chunk_code_doc(self, doc) -> List:
+        """Chunk code with smaller chunks"""
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=800,
+            chunk_overlap=100
+        )
+        chunks = splitter.split_text(doc.page_content)
+        from langchain.schema import Document
+        return [
+            Document(
+                page_content=chunk,
+                metadata={**doc.metadata, 'chunk_type': 'code'}
+            )
+            for chunk in chunks
+        ]
+    
+    def _chunk_generic_doc(self, doc) -> List:
+        """Generic chunking"""
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.ingestion_config.chunk_size,
+            chunk_overlap=self.ingestion_config.chunk_overlap
+        )
+        chunks = splitter.split_text(doc.page_content)
+        from langchain.schema import Document
+        return [
+            Document(
+                page_content=chunk,
+                metadata={**doc.metadata, 'chunk_type': 'generic'}
+            )
+            for chunk in chunks
+        ]
+    
+    def _extract_terraform_block_type(self, block: str) -> str:
+        """Extract block type from Terraform block"""
+        patterns = [
+            (r'resource\s+"([^"]+)"', 'resource'),
+            (r'data\s+"([^"]+)"', 'data'),
+            (r'module\s+"([^"]+)"', 'module'),
+            (r'variable\s+"([^"]+)"', 'variable'),
+            (r'output\s+"([^"]+)"', 'output'),
+            (r'locals\s*\{', 'locals')
+        ]
+        
+        for pattern, block_type in patterns:
+            match = re.search(pattern, block)
+            if match:
+                return block_type
+        return 'unknown'
+    
+    def _extract_terraform_resource_type(self, resource_block: str) -> str:
+        """Extract resource type from Terraform block"""
+        match = re.search(r'resource\s+"([^"]+)"', resource_block)
+        return match.group(1) if match else 'unknown'
+    
+    def _chunk_pricing_doc(self, doc) -> List:
+        """Chunk pricing docs by preserving pricing tables and cost information"""
+        content = doc.page_content
+        
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        # Use smaller chunks for pricing to keep related pricing info together
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=600,
+            chunk_overlap=100,
+            separators=["\n## ", "\n### ", "\n\n", "\n", " "]
+        )
+        
+        chunks = []
+        text_chunks = splitter.split_text(content)
+        
+        for chunk in text_chunks:
+            from langchain.schema import Document
+            chunk_doc = Document(
+                page_content=chunk,
+                metadata={**doc.metadata, 'chunk_type': 'pricing_data'}
+            )
+            chunks.append(chunk_doc)
+        
+        return chunks
+    
+
+    
+    def _chunk_api_doc(self, doc) -> List:
+        """Chunk API docs by endpoints and methods"""
+        content = doc.page_content
+        chunks = []
+        
+        # Extract API endpoints
+        endpoint_patterns = [
+            r'((?:GET|POST|PUT|DELETE|PATCH)\s+[^\n]*\n(?:[^\n]*\n)*?(?=(?:GET|POST|PUT|DELETE|PATCH)|$))',
+            r'(### [^\n]*(?:endpoint|API|method)[^\n]*\n.*?)(?=### |## |$)'
+        ]
+        
+        found_endpoints = []
+        for pattern in endpoint_patterns:
+            endpoints = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
+            found_endpoints.extend(endpoints)
+        
+        if found_endpoints:
+            for endpoint in found_endpoints:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content=endpoint,
+                    metadata={**doc.metadata, 'chunk_type': 'api_endpoint'}
+                )
+                chunks.append(chunk_doc)
+        else:
+            # Split by code blocks and descriptions
+            parts = re.split(r'(```[^`]*```)', content)
+            current_chunk = []
+            
+            for part in parts:
+                if part.startswith('```'):
+                    # Code block - keep with surrounding text
+                    if current_chunk:
+                        current_chunk.append(part)
+                    else:
+                        current_chunk = [part]
+                else:
+                    # Regular text
+                    if len(''.join(current_chunk) + part) > 1200 and current_chunk:
+                        from langchain.schema import Document
+                        chunk_doc = Document(
+                            page_content=''.join(current_chunk),
+                            metadata={**doc.metadata, 'chunk_type': 'api_section'}
+                        )
+                        chunks.append(chunk_doc)
+                        current_chunk = [part]
+                    else:
+                        current_chunk.append(part)
+            
+            if current_chunk:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content=''.join(current_chunk),
+                    metadata={**doc.metadata, 'chunk_type': 'api_section'}
+                )
+                chunks.append(chunk_doc)
+        
+        return chunks
+    
+    def _chunk_tutorials_doc(self, doc) -> List:
+        """Chunk tutorials by preserving complete steps"""
+        content = doc.page_content
+        chunks = []
+        
+        # Extract numbered steps and procedures
+        step_patterns = [
+            r'((?:Step \d+|\d+\.|\d+\))[^\n]*\n.*?)(?=(?:Step \d+|\d+\.|\d+\))|## |$)',
+            r'(## [^\n]*(?:[Ss]tep|[Pp]rocedure|[Tt]ask)[^\n]*\n.*?)(?=## |$)'
+        ]
+        
+        found_steps = []
+        for pattern in step_patterns:
+            steps = re.findall(pattern, content, re.MULTILINE | re.DOTALL)
+            found_steps.extend(steps)
+        
+        if found_steps:
+            # Combine small steps, keep large ones separate
+            current_chunk = []
+            current_size = 0
+            
+            for step in found_steps:
+                step_size = len(step)
+                
+                if step_size > 1500:
+                    # Large step gets its own chunk
+                    if current_chunk:
+                        from langchain.schema import Document
+                        chunk_doc = Document(
+                            page_content='\n\n'.join(current_chunk),
+                            metadata={**doc.metadata, 'chunk_type': 'tutorial_steps'}
+                        )
+                        chunks.append(chunk_doc)
+                        current_chunk = []
+                        current_size = 0
+                    
+                    from langchain.schema import Document
+                    chunk_doc = Document(
+                        page_content=step,
+                        metadata={**doc.metadata, 'chunk_type': 'tutorial_long_step'}
+                    )
+                    chunks.append(chunk_doc)
+                
+                elif current_size + step_size > 1200 and current_chunk:
+                    # Flush current chunk
+                    from langchain.schema import Document
+                    chunk_doc = Document(
+                        page_content='\n\n'.join(current_chunk),
+                        metadata={**doc.metadata, 'chunk_type': 'tutorial_steps'}
+                    )
+                    chunks.append(chunk_doc)
+                    current_chunk = [step]
+                    current_size = step_size
+                
+                else:
+                    # Add to current chunk
+                    current_chunk.append(step)
+                    current_size += step_size
+            
+            if current_chunk:
+                from langchain.schema import Document
+                chunk_doc = Document(
+                    page_content='\n\n'.join(current_chunk),
+                    metadata={**doc.metadata, 'chunk_type': 'tutorial_steps'}
+                )
+                chunks.append(chunk_doc)
+        
+        else:
+            # No clear steps found, use section-based chunking
+            sections = re.split(r'\n## ', content)
+            for i, section in enumerate(sections):
+                if section.strip():
+                    if i > 0:
+                        section = '## ' + section
+                    from langchain.schema import Document
+                    chunk_doc = Document(
+                        page_content=section,
+                        metadata={**doc.metadata, 'chunk_type': 'tutorial_section'}
+                    )
+                    chunks.append(chunk_doc)
+        
+        return chunks
+    
+    def _extract_aws_service_name(self, content: str) -> str:
+        """Extract AWS service name from content"""
+        aws_services = ['EC2', 'S3', 'RDS', 'Lambda', 'VPC', 'IAM', 'CloudWatch', 'ELB', 'Route53']
+        for service in aws_services:
+            if service.lower() in content.lower():
+                return service
+        return 'unknown'
     
     def display_processing_stats(self):
         """Display processing statistics."""
-        print(f"\n📊 Processing Statistics:")
-        print(f"   Documents loaded: {self.processing_stats.documents_loaded}")
-        print(f"   Chunks created: {self.processing_stats.chunks_created}")
-        print(f"   Embeddings created: {self.processing_stats.embeddings_created}")
-        print(f"   Processing time: {self.processing_stats.processing_time:.2f} seconds")
-        print(f"   Errors: {len(self.processing_stats.errors)}")
+        pass
     
     # Menu methods
     def add_pdf_source(self):
@@ -881,9 +1284,11 @@ def main():
             # Process each source
             for source in input_data.get('sources', []):
                 source_type = source.get('type')
+                custom_metadata = source.get('customMetadata', {})
                 
                 if source_type == 'web':
                     web_source = create_web_source(source.get('path'), source.get('docType', 'web_document'))
+                    web_source.metadata.update(custom_metadata)
                     ingestion.document_sources.append(web_source)
                 elif source_type == 'github':
                     github_source = create_github_codebase_source(
@@ -892,12 +1297,17 @@ def main():
                         source.get('extensions', []),
                         source.get('maxSize', 1024*1024)
                     )
+                    # Add token to metadata for loader access, but exclude from custom metadata
+                    github_source.metadata['access_token'] = source.get('token')
+                    github_source.metadata.update(custom_metadata)
                     ingestion.document_sources.append(github_source)
                 elif source_type == 'pdf':
                     pdf_source = create_pdf_source(source.get('path'), source.get('docType', 'pdf_document'))
+                    pdf_source.metadata.update(custom_metadata)
                     ingestion.document_sources.append(pdf_source)
                 elif source_type == 'csv':
                     csv_source = create_csv_source(source.get('path'), source.get('docType', 'csv_document'))
+                    csv_source.metadata.update(custom_metadata)
                     ingestion.document_sources.append(csv_source)
 
             
