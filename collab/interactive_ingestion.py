@@ -176,7 +176,7 @@ class InteractiveRAGIngestion:
             for i, source in enumerate(self.document_sources):
                 # Check stop flag
                 if hasattr(self, 'should_stop') and self.should_stop:
-                    msg = "🛑 Processing stopped by user"
+                    msg = "Processing stopped by user"
                     send_processing_update(session_id, "stopped", msg)
                     return
                 
@@ -210,7 +210,7 @@ class InteractiveRAGIngestion:
             
             # Check stop flag before chunking
             if hasattr(self, 'should_stop') and self.should_stop:
-                msg = "🛑 Processing stopped by user"
+                msg = "Processing stopped by user"
                 send_processing_update(session_id, "stopped", msg)
                 return
             
@@ -223,7 +223,7 @@ class InteractiveRAGIngestion:
             
             # Check stop flag before embeddings
             if hasattr(self, 'should_stop') and self.should_stop:
-                msg = "🛑 Processing stopped by user"
+                msg = "Processing stopped by user"
                 send_processing_update(session_id, "stopped", msg)
                 return
             
@@ -335,10 +335,10 @@ class InteractiveRAGIngestion:
             elif source.source_type == 'csv':
                 return self._load_csv_documents(source)
             else:
-                print(f"❌ Unsupported source type: {source.source_type}")
+                print(f"Unsupported source type: {source.source_type}")
                 return []
         except Exception as e:
-            print(f"❌ Error loading from {source.source_type}: {e}")
+            print(f"Error loading from {source.source_type}: {e}")
             return []
     
     def _load_pdf_documents(self, source: DocumentSource) -> List:
@@ -555,11 +555,11 @@ class InteractiveRAGIngestion:
         """Test search functionality."""
         query = input("\nEnter search query: ").strip()
         if not query:
-            print("❌ No query provided")
+            print("No query provided")
             return
         
         try:
-            print(f"\n🔍 Searching for: '{query}'")
+            print(f"\nSearching for: '{query}'")
             
             # Get query embedding
             query_embedding = self.embeddings.embed_query(query)
@@ -572,14 +572,14 @@ class InteractiveRAGIngestion:
             )
             
             if search_results.matches:
-                print(f"\n📋 Found {len(search_results.matches)} results:")
+                print(f"\nFound {len(search_results.matches)} results:")
                 for i, match in enumerate(search_results.matches, 1):
                     print(f"\n{i}. Score: {match.score:.4f}")
                     print(f"   Source: {match.metadata.get('source_path', 'Unknown')}")
                     print(f"   Content: {match.metadata.get('text', '')[:200]}...")
                 
                 # Test RAG response
-                print(f"\n🤖 Generating RAG response...")
+                print(f"\nGenerating RAG response...")
                 context = "\n\n".join([match.metadata.get('text', '') for match in search_results.matches[:3]])
                 
                 prompt = f"""Use the following context to answer the question. If you don't know the answer based on the context, say you don't know.
@@ -591,12 +591,12 @@ Question: {query}
 Answer:"""
                 
                 response = self.llm.invoke(prompt)
-                print(f"\n💬 RAG Response: {response}")
+                print(f"\nRAG Response: {response}")
             else:
-                print("\n❌ No results found")
+                print("\nNo results found")
                 
         except Exception as e:
-            print(f"\n❌ Search error: {e}")
+            print(f"\nSearch error: {e}")
             import traceback
             traceback.print_exc()
     
@@ -1031,20 +1031,20 @@ Answer:"""
     # Menu methods
     def add_pdf_source(self):
         """Add PDF document source."""
-        print("\n📄 Adding PDF Document")
+        print("\nAdding PDF Document")
         pdf_path = input("Enter PDF file path: ").strip()
         if not pdf_path or not Path(pdf_path).exists():
-            print("❌ Invalid file path")
+            print("Invalid file path")
             return
         
         doc_type = input("Document type (default: pdf_document): ").strip() or "pdf_document"
         source = create_pdf_source(pdf_path, doc_type)
         self.document_sources.append(source)
-        print(f"✅ Added PDF source: {pdf_path}")
+        print(f"Added PDF source: {pdf_path}")
     
     def add_web_sources(self):
         """Add web document sources."""
-        print("\n🌐 Adding Web Documents")
+        print("\nAdding Web Documents")
         print("Enter URLs (one per line, empty line to finish):")
         urls = []
         
@@ -1054,29 +1054,29 @@ Answer:"""
                 break
             if url.startswith('http'):
                 urls.append(url)
-                print(f"  ✅ Added: {url}")
+                print(f"  Added: {url}")
             else:
-                print(f"  ❌ Invalid URL: {url}")
+                print(f"  Invalid URL: {url}")
         
         if not urls:
-            print("❌ No valid URLs provided")
+            print("No valid URLs provided")
             return
         
         for url in urls:
             source = create_web_source(url, 'web_documentation')
             self.document_sources.append(source)
         
-        print(f"✅ Added {len(urls)} web sources")
+        print(f"Added {len(urls)} web sources")
     
     def add_confluence_source(self):
         """Add Confluence document source."""
-        print("\n📋 Adding Confluence Source")
+        print("\nAdding Confluence Source")
         confluence_url = input("Confluence URL: ").strip()
         username = input("Username: ").strip()
         api_key = input("API Key: ").strip()
         
         if not all([confluence_url, username, api_key]):
-            print("❌ Missing required credentials")
+            print("Missing required credentials")
             return
         
         page_ids_input = input("Page IDs (comma-separated, optional): ").strip()
@@ -1089,16 +1089,16 @@ Answer:"""
         )
         
         self.document_sources.append(source)
-        print(f"✅ Added Confluence source: {confluence_url}")
+        print(f"Added Confluence source: {confluence_url}")
     
     def add_github_source(self):
         """Add GitHub repository source for issues/PRs."""
-        print("\n🐙 Adding GitHub Repository (Issues/PRs)")
+        print("\nAdding GitHub Repository (Issues/PRs)")
         repo = input("Repository (e.g., 'owner/repo'): ").strip()
         access_token = input("GitHub access token (optional): ").strip()
         
         if not repo:
-            print("❌ Repository name is required")
+            print("Repository name is required")
             return
         
         include_prs = input("Include Pull Requests? (y/n): ").strip().lower() == 'y'
@@ -1109,16 +1109,16 @@ Answer:"""
         )
         
         self.document_sources.append(source)
-        print(f"✅ Added GitHub source: {repo}")
+        print(f"Added GitHub source: {repo}")
     
     def add_github_codebase_source(self):
         """Add GitHub codebase source."""
-        print("\n💻 Adding GitHub Codebase")
+        print("\nAdding GitHub Codebase")
         repo = input("Repository (e.g., 'owner/repo'): ").strip()
         access_token = input("GitHub access token (optional): ").strip()
         
         if not repo:
-            print("❌ Repository name is required")
+            print("Repository name is required")
             return
         
         print("\nFile extension filtering:")
@@ -1143,40 +1143,40 @@ Answer:"""
         )
         
         self.document_sources.append(source)
-        print(f"✅ Added GitHub codebase source: {repo}")
+        print(f"Added GitHub codebase source: {repo}")
     
     def add_predefined_aws_sources(self):
         """Add predefined AWS documentation sources."""
-        print("\n🌐 Adding AWS Documentation Sources")
+        print("\nAdding AWS Documentation Sources")
         self.document_sources.extend(AWS_DOCUMENTATION_SOURCES)
-        print(f"✅ Added {len(AWS_DOCUMENTATION_SOURCES)} AWS documentation sources")
+        print(f"Added {len(AWS_DOCUMENTATION_SOURCES)} AWS documentation sources")
     
     def add_terraform_sources(self):
         """Add Terraform documentation sources."""
-        print("\n🏗️ Adding Terraform Documentation Sources")
+        print("\nAdding Terraform Documentation Sources")
         self.document_sources.extend(TERRAFORM_DOCUMENTATION_SOURCES)
-        print(f"✅ Added {len(TERRAFORM_DOCUMENTATION_SOURCES)} Terraform documentation sources")
+        print(f"Added {len(TERRAFORM_DOCUMENTATION_SOURCES)} Terraform documentation sources")
     
     def add_csv_source(self):
         """Add CSV document source."""
-        print("\n📊 Adding CSV Document")
+        print("\nAdding CSV Document")
         csv_path = input("Enter CSV file path: ").strip()
         if not csv_path or not Path(csv_path).exists():
-            print("❌ Invalid file path")
+            print("Invalid file path")
             return
         
         doc_type = input("Document type (default: csv_document): ").strip() or "csv_document"
         source = create_csv_source(csv_path, doc_type)
         self.document_sources.append(source)
-        print(f"✅ Added CSV source: {csv_path}")
+        print(f"Added CSV source: {csv_path}")
     
     def display_sources(self):
         """Display current document sources."""
         if not self.document_sources:
-            print("\n📝 No document sources added yet")
+            print("\nNo document sources added yet")
             return
         
-        print(f"\n📝 Current Document Sources ({len(self.document_sources)}):")
+        print(f"\nCurrent Document Sources ({len(self.document_sources)}):")
         for i, source in enumerate(self.document_sources, 1):
             doc_type = source.metadata.get('doc_type', 'unknown')
             print(f"{i:2d}. [{source.source_type.upper()}] {source.source_path}")
@@ -1185,7 +1185,7 @@ Answer:"""
     def remove_source(self):
         """Remove a document source."""
         if not self.document_sources:
-            print("\n❌ No sources to remove")
+            print("\nNo sources to remove")
             return
         
         self.display_sources()
@@ -1194,15 +1194,15 @@ Answer:"""
             index = int(input("Enter source number to remove: ")) - 1
             if 0 <= index < len(self.document_sources):
                 removed = self.document_sources.pop(index)
-                print(f"✅ Removed: {removed.source_path}")
+                print(f"Removed: {removed.source_path}")
             else:
-                print("❌ Invalid source number")
+                print("Invalid source number")
         except ValueError:
-            print("❌ Invalid input")
+            print("Invalid input")
     
     def display_menu(self):
         """Display main menu."""
-        print("\n📋 RAG Ingestion Menu")
+        print("\nRAG Ingestion Menu")
         print("=" * 25)
         print("1. Add PDF document")
         print("2. Add web documents")
@@ -1229,7 +1229,7 @@ Answer:"""
                 choice = input("\nSelect option: ").strip()
                 
                 if choice == '0':
-                    print("\n👋 Goodbye!")
+                    print("\nGoodbye!")
                     break
                 elif choice == '1':
                     self.add_pdf_source()
@@ -1258,13 +1258,13 @@ Answer:"""
                 elif choice == '13':
                     self.display_index_stats()
                 else:
-                    print("\n❌ Invalid option")
+                    print("\nInvalid option")
                     
             except KeyboardInterrupt:
-                print("\n\n👋 Interrupted by user. Goodbye!")
+                print("\n\nInterrupted by user. Goodbye!")
                 break
             except Exception as e:
-                print(f"\n❌ Unexpected error: {e}")
+                print(f"\nUnexpected error: {e}")
 
 def main():
     """Main execution function."""
@@ -1324,7 +1324,7 @@ def main():
             ingestion = InteractiveRAGIngestion()
             ingestion.run()
         except Exception as e:
-            print(f"\n❌ Fatal error: {e}")
+            print(f"\nFatal error: {e}")
             exit(1)
 
 if __name__ == "__main__":

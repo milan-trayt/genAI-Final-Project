@@ -246,7 +246,7 @@ class QueryProcessor:
             )
             
             # Skip test embedding to avoid initialization timeout
-            logger.info("✅ OpenAI embeddings initialized (test skipped)")
+            logger.info("OpenAI embeddings initialized (test skipped)")
             
             # Initialize Pinecone with retry logic
             from pinecone import Pinecone
@@ -268,7 +268,7 @@ class QueryProcessor:
                         raise ValueError(f"Pinecone index '{index_name}' not found. Please run interactive_ingestion.py first to create and populate the index.")
                     
                     self.pinecone_index = pc.Index(index_name)
-                    logger.info("✅ Connected to existing Pinecone index")
+                    logger.info("Connected to existing Pinecone index")
                     break
                     
                 except Exception as e:
@@ -292,7 +292,7 @@ class QueryProcessor:
             )
             
             self._initialized = True
-            logger.info("✅ Query processor initialized successfully")
+            logger.info("Query processor initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize query processor: {e}")

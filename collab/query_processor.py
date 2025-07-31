@@ -245,7 +245,7 @@ class QueryProcessor:
             
             # Test embeddings
             test_embedding = self.embeddings.embed_query("test")
-            logger.info(f"✅ OpenAI embeddings working (dimension: {len(test_embedding)})")
+            logger.info(f"OpenAI embeddings working (dimension: {len(test_embedding)})")
             
             # Initialize Pinecone
             from pinecone import Pinecone
@@ -259,7 +259,7 @@ class QueryProcessor:
                 raise ValueError(f"Pinecone index '{index_name}' not found. Please run interactive_ingestion.py first to create and populate the index.")
             
             self.pinecone_index = pc.Index(index_name)
-            logger.info("✅ Connected to existing Pinecone index")
+            logger.info("Connected to existing Pinecone index")
             
             # Create LangChain Pinecone vectorstore
             from langchain_pinecone import PineconeVectorStore
@@ -275,7 +275,7 @@ class QueryProcessor:
             )
             
             self._initialized = True
-            logger.info("✅ Query processor initialized successfully")
+            logger.info("Query processor initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize query processor: {e}")

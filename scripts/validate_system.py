@@ -34,7 +34,7 @@ class SystemValidator:
         
     def validate_configuration(self) -> bool:
         """Validate system configuration."""
-        logger.info("🔧 Validating system configuration...")
+        logger.info("Validating system configuration...")
         
         try:
             # Run configuration validator
@@ -44,19 +44,19 @@ class SystemValidator:
             ], capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
-                logger.info("✅ Configuration validation passed")
+                logger.info("Configuration validation passed")
                 return True
             else:
-                logger.error(f"❌ Configuration validation failed: {result.stderr}")
+                logger.error(f"Configuration validation failed: {result.stderr}")
                 return False
                 
         except Exception as e:
-            logger.error(f"❌ Configuration validation error: {e}")
+            logger.error(f"Configuration validation error: {e}")
             return False
     
     def validate_dependencies(self) -> bool:
         """Validate all system dependencies."""
-        logger.info("📦 Validating system dependencies...")
+        logger.info("Validating system dependencies...")
         
         # Check Python packages
         required_packages = [
@@ -72,15 +72,15 @@ class SystemValidator:
                 missing_packages.append(package)
         
         if missing_packages:
-            logger.error(f"❌ Missing packages: {missing_packages}")
+            logger.error(f"Missing packages: {missing_packages}")
             return False
         
-        logger.info("✅ All required packages are installed")
+        logger.info("All required packages are installed")
         return True
     
     def validate_file_structure(self) -> bool:
         """Validate project file structure."""
-        logger.info("📁 Validating file structure...")
+        logger.info("Validating file structure...")
         
         required_files = [
             "backend/main.py",
@@ -101,10 +101,10 @@ class SystemValidator:
                 missing_files.append(file_path)
         
         if missing_files:
-            logger.error(f"❌ Missing files: {missing_files}")
+            logger.error(f"Missing files: {missing_files}")
             return False
         
-        logger.info("✅ All required files are present")
+        logger.info("All required files are present")
         return True
     
     def validate_tests(self) -> bool:
@@ -120,22 +120,22 @@ class SystemValidator:
             ], capture_output=True, text=True, timeout=300, cwd=self.project_root)
             
             if result.returncode == 0:
-                logger.info("✅ Test suite passed")
+                logger.info("Test suite passed")
                 return True
             else:
-                logger.error(f"❌ Test suite failed: {result.stdout}")
+                logger.error(f"Test suite failed: {result.stdout}")
                 return False
                 
         except subprocess.TimeoutExpired:
-            logger.error("❌ Test suite timed out")
+            logger.error("Test suite timed out")
             return False
         except Exception as e:
-            logger.error(f"❌ Test suite error: {e}")
+            logger.error(f"Test suite error: {e}")
             return False
     
     def validate_api_endpoints(self) -> bool:
         """Validate API endpoints are working."""
-        logger.info("🌐 Validating API endpoints...")
+        logger.info("Validating API endpoints...")
         
         # Check if backend is running
         backend_url = "http://localhost:8000"
@@ -143,7 +143,7 @@ class SystemValidator:
         try:
             response = requests.get(f"{backend_url}/health", timeout=5)
             if response.status_code == 200:
-                logger.info("✅ Backend API is accessible")
+                logger.info("Backend API is accessible")
                 
                 # Test additional endpoints
                 endpoints = ["/", "/config", "/stats"]
@@ -151,7 +151,7 @@ class SystemValidator:
                     try:
                         resp = requests.get(f"{backend_url}{endpoint}", timeout=5)
                         if resp.status_code == 200:
-                            logger.info(f"✅ Endpoint {endpoint} working")
+                            logger.info(f"Endpoint {endpoint} working")
                         else:
                             logger.warning(f"⚠️  Endpoint {endpoint} returned {resp.status_code}")
                     except Exception as e:
@@ -159,7 +159,7 @@ class SystemValidator:
                 
                 return True
             else:
-                logger.error(f"❌ Backend health check failed: {response.status_code}")
+                logger.error(f"Backend health check failed: {response.status_code}")
                 return False
                 
         except requests.exceptions.RequestException:
@@ -191,9 +191,9 @@ class SystemValidator:
                         ], capture_output=True, text=True, timeout=30)
                         
                         if result.returncode == 0:
-                            logger.info(f"✅ {compose_file} is valid")
+                            logger.info(f"{compose_file} is valid")
                         else:
-                            logger.error(f"❌ {compose_file} is invalid: {result.stderr}")
+                            logger.error(f"{compose_file} is invalid: {result.stderr}")
                             return False
                     except Exception as e:
                         logger.warning(f"⚠️  Could not validate {compose_file}: {e}")
@@ -206,7 +206,7 @@ class SystemValidator:
     
     def validate_documentation(self) -> bool:
         """Validate documentation completeness."""
-        logger.info("📚 Validating documentation...")
+        logger.info("Validating documentation...")
         
         required_docs = [
             "README.md",
@@ -226,24 +226,24 @@ class SystemValidator:
                     if len(content) < 500:  # At least 500 characters
                         logger.warning(f"⚠️  {doc_path} seems incomplete")
                     else:
-                        logger.info(f"✅ {doc_path} is present and substantial")
+                        logger.info(f"{doc_path} is present and substantial")
                 except Exception as e:
                     logger.warning(f"⚠️  Could not read {doc_path}: {e}")
         
         if missing_docs:
-            logger.error(f"❌ Missing documentation: {missing_docs}")
+            logger.error(f"Missing documentation: {missing_docs}")
             return False
         
         return True
     
     def validate_security_setup(self) -> bool:
         """Validate security configuration."""
-        logger.info("🔒 Validating security setup...")
+        logger.info("Validating security setup...")
         
         # Check for .env.example
         env_example = self.project_root / ".env.example"
         if not env_example.exists():
-            logger.error("❌ .env.example file missing")
+            logger.error(".env.example file missing")
             return False
         
         # Check that .env is not committed (should not exist in repo)
@@ -265,14 +265,14 @@ class SystemValidator:
             
             for key, description in security_checks:
                 if key in env_content:
-                    logger.info(f"✅ {description} configured")
+                    logger.info(f"{description} configured")
                 else:
                     logger.warning(f"⚠️  {description} not found in .env.example")
             
             return True
             
         except Exception as e:
-            logger.error(f"❌ Security validation failed: {e}")
+            logger.error(f"Security validation failed: {e}")
             return False
     
     def run_integration_tests(self) -> bool:
@@ -288,7 +288,7 @@ class SystemValidator:
             ], capture_output=True, text=True, timeout=180, cwd=self.project_root)
             
             if result.returncode == 0:
-                logger.info("✅ Integration tests passed")
+                logger.info("Integration tests passed")
                 return True
             else:
                 logger.warning(f"⚠️  Integration tests had issues: {result.stdout}")
@@ -300,7 +300,7 @@ class SystemValidator:
     
     def generate_validation_report(self) -> Dict[str, Any]:
         """Generate comprehensive validation report."""
-        logger.info("📋 Generating validation report...")
+        logger.info("Generating validation report...")
         
         report = {
             "validation_timestamp": datetime.utcnow().isoformat(),
@@ -320,7 +320,7 @@ class SystemValidator:
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2)
         
-        logger.info(f"📄 Validation report saved to: {report_file}")
+        logger.info(f"Validation report saved to: {report_file}")
         return report
     
     def _generate_recommendations(self) -> List[str]:
@@ -349,7 +349,7 @@ class SystemValidator:
     
     def run_complete_validation(self) -> bool:
         """Run complete system validation."""
-        logger.info("🚀 Starting comprehensive system validation...")
+        logger.info("Starting comprehensive system validation...")
         logger.info("=" * 60)
         
         # Define validation steps
@@ -374,12 +374,12 @@ class SystemValidator:
                 self.validation_results[validation_name] = result
                 
                 if result:
-                    logger.info(f"✅ {validation_name} validation PASSED")
+                    logger.info(f"{validation_name} validation PASSED")
                 else:
-                    logger.error(f"❌ {validation_name} validation FAILED")
+                    logger.error(f"{validation_name} validation FAILED")
                     
             except Exception as e:
-                logger.error(f"❌ {validation_name} validation ERROR: {e}")
+                logger.error(f"{validation_name} validation ERROR: {e}")
                 self.validation_results[validation_name] = False
         
         # Generate report
@@ -387,7 +387,7 @@ class SystemValidator:
         
         # Print summary
         logger.info("\n" + "=" * 60)
-        logger.info("🎯 SYSTEM VALIDATION SUMMARY")
+        logger.info("SYSTEM VALIDATION SUMMARY")
         logger.info("=" * 60)
         
         passed = sum(1 for result in self.validation_results.values() if result)
@@ -397,11 +397,11 @@ class SystemValidator:
         logger.info(f"Validations passed: {passed}/{total} ({success_rate:.1%})")
         
         for validation_name, result in self.validation_results.items():
-            status = "✅ PASS" if result else "❌ FAIL"
+            status = "PASS" if result else "FAIL"
             logger.info(f"  {validation_name:<20} {status}")
         
         # Print recommendations
-        logger.info("\n📋 Recommendations:")
+        logger.info("\nRecommendations:")
         for rec in report["recommendations"]:
             logger.info(f"  • {rec}")
         
@@ -410,7 +410,7 @@ class SystemValidator:
         critical_passed = all(self.validation_results.get(val, False) for val in critical_validations)
         
         if critical_passed and success_rate >= 0.7:  # 70% overall pass rate
-            logger.info("\n🎉 SYSTEM VALIDATION PASSED!")
+            logger.info("\nSYSTEM VALIDATION PASSED!")
             logger.info("The GenAI DevOps Assistant system is ready for use.")
             return True
         else:

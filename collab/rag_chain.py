@@ -195,7 +195,7 @@ class RAGChain:
             )
             
             self._initialized = True
-            logger.info("✅ RAG chains initialized successfully")
+            logger.info("RAG chains initialized successfully")
             
         except Exception as e:
             logger.error(f"Failed to initialize RAG chains: {e}")

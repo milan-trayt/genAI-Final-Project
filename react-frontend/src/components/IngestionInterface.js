@@ -61,7 +61,7 @@ const IngestionInterface = () => {
     let pollCount = 0;
     const maxPolls = 60; // Poll for up to 5 minutes (60 * 5s intervals)
     
-    setProcessingDetails(prev => [...prev, '🔄 WebSocket failed, switching to polling mode...']);
+    setProcessingDetails(prev => [...prev, 'WebSocket failed, switching to polling mode...']);
     
     const poll = async () => {
       try {
@@ -69,28 +69,28 @@ const IngestionInterface = () => {
         const response = await axios.get(`${COLLAB_URL}/api/status`);
         
         if (response.data.status === 'ready') {
-          setProcessingDetails(prev => [...prev, `🔄 Polling for status updates... (${pollCount + 1}/${maxPolls})`]);
+          setProcessingDetails(prev => [...prev, `Polling for status updates... (${pollCount + 1}/${maxPolls})`]);
           
           pollCount++;
           if (pollCount < maxPolls && isProcessing) {
             setTimeout(poll, 5000); // Poll every 5 seconds
           } else if (pollCount >= maxPolls) {
             setError('Processing timeout - no updates received after 5 minutes');
-            setProcessingStep('❌ Processing timeout');
+            setProcessingStep('Processing timeout');
             setIsProcessing(false);
             setProcessingComplete(true);
           }
         } else {
           // Processing might be complete, check one more time
-          setProcessingDetails(prev => [...prev, '✅ Processing appears to be complete']);
+          setProcessingDetails(prev => [...prev, 'Processing appears to be complete']);
           setSuccess(true);
-          setProcessingStep('🎉 Processing completed (detected via polling)');
+          setProcessingStep('Processing completed (detected via polling)');
           setIsProcessing(false);
           setProcessingComplete(true);
         }
       } catch (error) {
         setError('Failed to connect to processing server');
-        setProcessingStep('❌ Connection failed');
+        setProcessingStep('Connection failed');
         setIsProcessing(false);
         setProcessingComplete(true);
       }
@@ -105,14 +105,14 @@ const IngestionInterface = () => {
     
     setIsProcessing(true);
     setProcessingDetails([]);
-    setProcessingStep('🔧 Connecting to WebSocket...');
+    setProcessingStep('Connecting to WebSocket...');
     setError(null);
     setSuccess(false);
     setProcessingComplete(false);
     
     localStorage.setItem('isProcessing', 'true');
     localStorage.setItem('processingDetails', JSON.stringify([]));
-    localStorage.setItem('processingStep', '🔧 Connecting to WebSocket...');
+    localStorage.setItem('processingStep', 'Connecting to WebSocket...');
     localStorage.removeItem('processingError');
     localStorage.setItem('processingSuccess', 'false');
     localStorage.setItem('processingComplete', 'false');
@@ -143,7 +143,7 @@ const IngestionInterface = () => {
       console.log('WebSocket connected');
       setConnectionStatus('connected');
       setConnectionMessage('Connected to processing server');
-      setProcessingStep('🔧 Connected, joining room...');
+      setProcessingStep('Connected, joining room...');
       socket.emit('join_session', { session_id: sessionId });
       
       // Set a timeout to disconnect if no response
@@ -152,7 +152,7 @@ const IngestionInterface = () => {
           console.log('No response received, disconnecting');
           setConnectionStatus('error');
           setConnectionMessage('Connection timeout - no response from server');
-          setProcessingStep('❌ Connection timeout');
+          setProcessingStep('Connection timeout');
           setError('WebSocket connection timeout');
           setIsProcessing(false);
           setProcessingComplete(true);
@@ -168,7 +168,7 @@ const IngestionInterface = () => {
       if (processingStarted) return;
       processingStarted = true;
       
-      setProcessingStep('🔧 Starting processing...');
+      setProcessingStep('Starting processing...');
       
       await new Promise(resolve => setTimeout(resolve, 500));
       
@@ -201,7 +201,7 @@ const IngestionInterface = () => {
         setIsProcessing(false);
         setProcessingComplete(true);
         const errorMessage = error.response?.data?.message || error.message || 'Network error occurred';
-        setProcessingStep('❌ Connection failed');
+        setProcessingStep('Connection failed');
         setProcessingDetails(prev => [...prev, `Error: ${errorMessage}`]);
         setError(errorMessage);
         socket.disconnect();
@@ -209,7 +209,7 @@ const IngestionInterface = () => {
     });
     
     socket.on('processing_update', (data) => {
-      console.log('🎯 RECEIVED processing_update:', data);
+      console.log('RECEIVED processing_update:', data);
       
       if (data.type === 'log') {
         setProcessingDetails(prev => {
@@ -238,15 +238,15 @@ const IngestionInterface = () => {
           
           if (data.status === 'success') {
             setSuccess(true);
-            setProcessingStep('🎉 Processing completed successfully!');
+            setProcessingStep('Processing completed successfully!');
             localStorage.setItem('processingSuccess', 'true');
-            localStorage.setItem('processingStep', '🎉 Processing completed successfully!');
+            localStorage.setItem('processingStep', 'Processing completed successfully!');
             
             // Add final stats if available
             if (data.data?.stats) {
               const stats = data.data.stats;
               const statsDetails = [
-                `📊 Final Statistics:`,
+                `Final Statistics:`,
                 `   • Total sources: ${stats.total_sources}`,
                 `   • Processing time: ${stats.processing_time?.toFixed(2)}s`
               ];
@@ -259,15 +259,15 @@ const IngestionInterface = () => {
           } else {
             const errorMsg = data.message || 'Processing failed';
             setError(errorMsg);
-            setProcessingStep('❌ Processing failed');
+            setProcessingStep('Processing failed');
             localStorage.setItem('processingError', errorMsg);
-            localStorage.setItem('processingStep', '❌ Processing failed');
+            localStorage.setItem('processingStep', 'Processing failed');
           }
           socket.disconnect();
         } else {
           // Individual source completed, just log it
           setProcessingDetails(prev => {
-            const newDetails = [...prev, data.message || '✅ Source completed'];
+            const newDetails = [...prev, data.message || 'Source completed'];
             localStorage.setItem('processingDetails', JSON.stringify(newDetails));
             return newDetails;
           });
@@ -280,9 +280,9 @@ const IngestionInterface = () => {
         setIsProcessing(false);
         setProcessingComplete(true);
         setError(data.message || 'Processing error occurred');
-        setProcessingStep('❌ Processing failed');
+        setProcessingStep('Processing failed');
         localStorage.setItem('processingError', data.message || 'Processing error occurred');
-        localStorage.setItem('processingStep', '❌ Processing failed');
+        localStorage.setItem('processingStep', 'Processing failed');
         if (data.details) {
           setProcessingDetails(prev => {
             const newDetails = [...prev, `Error details: ${data.details}`];
@@ -298,7 +298,7 @@ const IngestionInterface = () => {
       console.error('WebSocket error:', error);
       setConnectionStatus('error');
       setConnectionMessage('WebSocket connection failed, falling back to polling');
-      setProcessingStep('🔄 WebSocket failed, using polling fallback...');
+      setProcessingStep('WebSocket failed, using polling fallback...');
       
       // Start fallback polling
       startPollingFallback(sessionId);
@@ -310,7 +310,7 @@ const IngestionInterface = () => {
       setConnectionMessage(`Disconnected: ${reason}`);
       
       if (reason === 'ping timeout' && !processingComplete) {
-        setProcessingStep('🔄 Connection lost, attempting to reconnect...');
+        setProcessingStep('Connection lost, attempting to reconnect...');
       }
     });
     
@@ -318,7 +318,7 @@ const IngestionInterface = () => {
       console.log('WebSocket reconnected after', attemptNumber, 'attempts');
       setConnectionStatus('connected');
       setConnectionMessage('Reconnected to processing server');
-      setProcessingStep('🔄 Reconnected, resuming processing...');
+      setProcessingStep('Reconnected, resuming processing...');
       
       if (!processingStarted) {
         socket.emit('join_session', { session_id: sessionId });
@@ -329,14 +329,14 @@ const IngestionInterface = () => {
       console.log('WebSocket reconnection attempt:', attemptNumber);
       setConnectionStatus('connecting');
       setConnectionMessage(`Reconnection attempt ${attemptNumber}/5`);
-      setProcessingStep(`🔄 Reconnection attempt ${attemptNumber}/5...`);
+      setProcessingStep(`Reconnection attempt ${attemptNumber}/5...`);
     });
     
     socket.on('reconnect_failed', () => {
       console.log('WebSocket reconnection failed');
       setConnectionStatus('error');
       setConnectionMessage('Reconnection failed, falling back to polling');
-      setProcessingStep('❌ Reconnection failed, using polling fallback...');
+      setProcessingStep('Reconnection failed, using polling fallback...');
       
       // Start fallback polling
       startPollingFallback(sessionId);
@@ -350,7 +350,7 @@ const IngestionInterface = () => {
       await axios.post(`${COLLAB_URL}/api/stop`, {
         session_id: currentSessionId
       });
-      setProcessingStep('🛑 Stopping processing...');
+      setProcessingStep('Stopping processing...');
     } catch (error) {
       console.error('Failed to stop processing:', error);
     }
@@ -368,7 +368,7 @@ const IngestionInterface = () => {
   return (
     <div className="ingestion-interface">
       <div className="ingestion-sidebar">
-        <h3>📚 Document Sources ({sources.length})</h3>
+        <h3>Document Sources ({sources.length})</h3>
         
         {sources.length > 0 ? (
           <div className="sources-list">
@@ -382,11 +382,11 @@ const IngestionInterface = () => {
                     </span>
                     {(source.priority || source.category || source.tags?.length > 0) && (
                       <div className="source-metadata">
-                        {source.priority && <span className="metadata-tag">📊 {source.priority}</span>}
-                        {source.category && <span className="metadata-tag">📁 {source.category}</span>}
+                        {source.priority && <span className="metadata-tag">{source.priority}</span>}
+                        {source.category && <span className="metadata-tag">{source.category}</span>}
                         {source.tags?.length > 0 && (
                           source.tags.slice(0,2).map((tag, i) => (
-                            <span key={i} className="metadata-tag">🏷️ {tag}</span>
+                            <span key={i} className="metadata-tag">{tag}</span>
                           ))
                         )}
                         {source.tags?.length > 2 && (
@@ -410,7 +410,7 @@ const IngestionInterface = () => {
               disabled={isProcessing}
               className="clear-sources"
             >
-              🗑️ Clear All
+              Clear All
             </button>
           </div>
         ) : (
@@ -437,21 +437,21 @@ const IngestionInterface = () => {
                     onClick={stopProcessing}
                     className="stop-processing"
                   >
-                    🛑 Stop Processing
+                    Stop Processing
                   </button>
                   <button 
                     onClick={() => {
                       setIsProcessing(false);
                       setProcessingComplete(true);
                       setError('Processing force stopped');
-                      setProcessingStep('🛑 Force stopped');
+                      setProcessingStep('Force stopped');
                       setCurrentSessionId(null);
                       clearProcessingData();
                     }}
                     className="force-reset"
                     title="Force reset if processing is stuck"
                   >
-                    🔄 Force Reset
+                    Force Reset
                   </button>
                 </>
               )}
@@ -486,7 +486,7 @@ const IngestionInterface = () => {
                     }}
                     className="clear-and-continue"
                   >
-                    {success ? '🎉 Clear Sources & Add More' : '🗑️ Clear Sources & Retry'}
+                    {success ? 'Clear Sources & Add More' : 'Clear Sources & Retry'}
                   </button>
                 </>
               )}
@@ -564,7 +564,7 @@ const ProcessingStatus = ({ step, details, error, success, isProcessing, connect
         {isProcessing && <div className="spinner"></div>}
         {error && <XCircle className="status-icon error" size={24} />}
         {success && <CheckCircle className="status-icon success" size={24} />}
-        <h2>{isProcessing ? '🔄 Processing Documents' : success ? '✅ Processing Complete' : '❌ Processing Failed'}</h2>
+        <h2>{isProcessing ? 'Processing Documents' : success ? 'Processing Complete' : 'Processing Failed'}</h2>
       </div>
       
       {/* Connection Status Indicator */}
@@ -691,7 +691,7 @@ const WebTab = ({ addSource }) => {
 
   return (
     <div className="web-tab">
-      <h3>🌐 Web Documents</h3>
+      <h3>Web Documents</h3>
       {addError && (
         <div className="error-message">
           <AlertCircle size={16} />
@@ -716,9 +716,9 @@ const WebTab = ({ addSource }) => {
       
       {pendingSources.length > 0 && (
         <div className="pending-sources">
-          <h4>📝 Set Metadata for Web Sources:</h4>
+          <h4>Set Metadata for Web Sources:</h4>
           <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
-            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Sources:</h5>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>Apply to All Sources:</h5>
             <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
               <select 
                 key={`web-priority-${Date.now()}`}
@@ -887,7 +887,7 @@ const GitHubTab = ({ addSource }) => {
 
   return (
     <div className="github-tab">
-      <h3>🐙 GitHub Repositories</h3>
+      <h3>GitHub Repositories</h3>
       {addError && (
         <div className="error-message">
           <AlertCircle size={16} />
@@ -918,9 +918,9 @@ const GitHubTab = ({ addSource }) => {
       
       {pendingSources.length > 0 && (
         <div className="pending-sources">
-          <h4>📝 Set Metadata for GitHub Sources:</h4>
+          <h4>Set Metadata for GitHub Sources:</h4>
           <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
-            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Sources:</h5>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>Apply to All Sources:</h5>
             <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
               <select 
                 key={`github-priority-${Date.now()}`}
@@ -1151,7 +1151,7 @@ const FilesTab = ({ addSource, collabUrl }) => {
 
   return (
     <div className="files-tab">
-      <h3>📁 File Upload</h3>
+      <h3>File Upload</h3>
       {addError && (
         <div className="error-message">
           <AlertCircle size={16} />
@@ -1197,9 +1197,9 @@ const FilesTab = ({ addSource, collabUrl }) => {
       
       {pendingFiles.length > 0 && (
         <div className="pending-files">
-          <h4>📝 Set Metadata for Files:</h4>
+          <h4>Set Metadata for Files:</h4>
           <div style={{padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '5px', marginBottom: '15px'}}>
-            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>🔧 Apply to All Files:</h5>
+            <h5 style={{margin: '0 0 10px 0', color: '#333'}}>Apply to All Files:</h5>
             <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap'}}>
               <select 
                 key={`files-priority-${Date.now()}`}

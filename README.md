@@ -7,46 +7,46 @@
 
 An advanced AI-powered DevOps assistant that provides intelligent AWS infrastructure guidance through conversational AI. Built with a modern three-tier architecture featuring real-time document processing, multi-modal query handling, and comprehensive session management.
 
-## ✨ Key Features
+## Key Features
 
-- 🤖 **Multi-Modal AI Queries**: Service recommendations, pricing analysis, Terraform generation
-- 📚 **Intelligent Document Processing**: Real-time ingestion with smart chunking
-- 💬 **Advanced Chat Interface**: Multi-tab sessions with persistent history
-- 🔍 **Smart Retrieval**: Context-aware vector search with semantic caching
-- 🛡️ **Content Guardrails**: Intelligent query validation and filtering
-- ⚡ **Real-Time Updates**: WebSocket-powered live processing feedback
-- 🏗️ **Production Ready**: Docker containerization with health monitoring
+- **Multi-Modal AI Queries**: Service recommendations, pricing analysis, Terraform generation
+- **Intelligent Document Processing**: Real-time ingestion with smart chunking
+- **Advanced Chat Interface**: Multi-tab sessions with persistent history
+- **Smart Retrieval**: Context-aware vector search with semantic caching
+- **Content Guardrails**: Intelligent query validation and filtering
+- **Real-Time Updates**: WebSocket-powered live processing feedback
+- **Production Ready**: Docker containerization with health monitoring
 
-## 🏗️ System Architecture
+## System Architecture
 
 The system uses a clear separation of concerns across three distinct layers:
 
-### 🎨 Frontend Layer - React Multi-Tab Interface
+### Frontend Layer - React Multi-Tab Interface
 - Modern React 18 with multi-tab chat sessions
 - Real-time WebSocket communication for live updates
 - Advanced query type selection (General, Service Recommendation, Pricing, Terraform)
 - Responsive design with mobile support
 
-### ⚙️ Backend Layer - FastAPI RAG Engine
+### Backend Layer - FastAPI RAG Engine
 - High-performance async FastAPI application
 - Comprehensive RAG (Retrieval-Augmented Generation) pipeline
 - Multi-modal query processing with specialized handlers
 - Advanced session management with hybrid storage
 - Intelligent content guardrails and validation
 
-### 🔄 Processing Layer - Document Ingestion Pipeline
+### Processing Layer - Document Ingestion Pipeline
 - Flask API server with WebSocket support
 - Interactive Jupyter Lab environment for development
 - Smart document chunking based on content type
 - Multi-source support (Web, GitHub, PDF, CSV)
 - Real-time processing updates with detailed logging
 
-### 💾 Data Layer - Hybrid Storage System
+### Data Layer - Hybrid Storage System
 - **PostgreSQL**: Persistent session and message storage
 - **Redis**: High-performance caching and session state
 - **Pinecone**: Scalable vector database for semantic search
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose (v2.0+)
@@ -54,7 +54,7 @@ The system uses a clear separation of concerns across three distinct layers:
 - Pinecone API key with vector database
 - 8GB+ RAM recommended
 
-### 🔧 Installation
+### Installation
 
 1. **Clone the repository:**
    ```bash
@@ -88,7 +88,7 @@ The system uses a clear separation of concerns across three distinct layers:
    docker compose logs -f
    ```
 
-### 🌐 Service Access
+### Service Access
 
 | Service | URL | Purpose |
 |---------|-----|----------|
@@ -99,18 +99,18 @@ The system uses a clear separation of concerns across three distinct layers:
 | **PostgreSQL** | localhost:5432 | Database access |
 | **Redis** | localhost:6379 | Cache monitoring |
 
-### ⚡ First Steps
+### First Steps
 
 1. **Access the application** at http://localhost:3000
 2. **Ingest documents** using the "Document Ingestion" tab
 3. **Start chatting** with AWS-focused queries
 4. **Explore query types**: General, Service Recommendations, Pricing, Terraform
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 genai-devops-assistant/
-├── 🎨 react-frontend/         # Modern React Interface
+├── react-frontend/         # Modern React Interface
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── ChatInterface.js      # Multi-tab chat system
@@ -121,7 +121,7 @@ genai-devops-assistant/
 │   ├── Dockerfile.dev               # Development container
 │   └── package.json                 # Dependencies
 │
-├── ⚙️ backend/                # FastAPI RAG Engine
+├── backend/                # FastAPI RAG Engine
 │   ├── main.py                      # API endpoints
 │   ├── rag_service.py              # Core RAG orchestration
 │   ├── rag_chain.py                # LangChain implementation
@@ -135,7 +135,7 @@ genai-devops-assistant/
 │   ├── models.py                   # Data models
 │   └── requirements.txt            # Python dependencies
 │
-├── 🔄 collab/                 # Document Processing Pipeline
+├── collab/                 # Document Processing Pipeline
 │   ├── api_server.py               # Flask API + WebSocket
 │   ├── interactive_ingestion.py    # Core ingestion logic
 │   ├── websocket_server.py         # Real-time communication
@@ -144,30 +144,30 @@ genai-devops-assistant/
 │   ├── config.py                   # Configuration
 │   └── uploads/                    # File storage
 │
-├── 🗄️ scripts/               # Database & Deployment
+├── scripts/               # Database & Deployment
 │   ├── init_db.sql                 # Database schema
 │   ├── deploy.sh                   # Deployment script
 │   └── validate_system.py          # System validation
 │
-├── 📋 docs/                   # Documentation
+├── docs/                   # Documentation
 │   └── CONFIGURATION.md            # Setup guide
 │
-├── 🐳 Infrastructure
+├── Infrastructure
 │   ├── docker-compose.yml          # Service orchestration
 │   ├── .env.example               # Environment template
 │   ├── setup.sh                   # Setup automation
 │   └── ARCHITECTURAL_REVIEW.md    # Technical documentation
 ```
 
-## 🛠️ Advanced Features
+## Advanced Features
 
-### 🤖 AI-Powered Query Processing
+### AI-Powered Query Processing
 
 #### Multi-Modal Query Types
-- **🔍 General Queries**: Comprehensive AWS/DevOps assistance with contextual responses
-- **🎯 Service Recommendations**: Chain-of-Thought reasoning for optimal AWS service selection
-- **💰 Pricing Analysis**: Detailed cost breakdowns with optimization strategies
-- **🏗️ Terraform Generation**: Production-ready Infrastructure-as-Code creation
+- **General Queries**: Comprehensive AWS/DevOps assistance with contextual responses
+- **Service Recommendations**: Chain-of-Thought reasoning for optimal AWS service selection
+- **Pricing Analysis**: Detailed cost breakdowns with optimization strategies
+- **Terraform Generation**: Production-ready Infrastructure-as-Code creation
 
 #### Intelligent Content Guardrails
 - **Context-Aware Validation**: Considers conversation history for better filtering
@@ -175,13 +175,13 @@ genai-devops-assistant/
 - **Automatic Session Management**: Smart cleanup on policy violations
 - **Graceful Error Handling**: User-friendly feedback with fallback options
 
-### 📚 Advanced Document Processing
+### Advanced Document Processing
 
 #### Smart Multi-Source Ingestion
-- **🌐 Web Sources**: JavaScript-heavy sites with Selenium automation
-- **🐙 GitHub Integration**: Repository code analysis with file filtering
-- **📄 Document Support**: PDF, CSV, and structured document processing
-- **🔄 Real-Time Processing**: WebSocket-powered live updates with detailed logging
+- **Web Sources**: JavaScript-heavy sites with Selenium automation
+- **GitHub Integration**: Repository code analysis with file filtering
+- **Document Support**: PDF, CSV, and structured document processing
+- **Real-Time Processing**: WebSocket-powered live updates with detailed logging
 
 #### Intelligent Chunking Strategies
 - **Content-Aware Segmentation**: Different strategies for code, docs, and data
@@ -189,7 +189,7 @@ genai-devops-assistant/
 - **AWS Documentation Optimization**: Service-focused content organization
 - **Metadata Enhancement**: Priority, category, and custom tag systems
 
-### 💬 Advanced Chat Interface
+### Advanced Chat Interface
 
 #### Multi-Tab Session Management
 - **Independent Contexts**: Each tab maintains separate conversation history
@@ -203,86 +203,86 @@ genai-devops-assistant/
 - **Quick Response Modal**: One-off queries without session creation
 - **Mobile-Responsive Design**: Optimized for all device sizes
 
-## 🔑 Configuration
+## Configuration
 
 ### Environment Variables
 
 ```bash
-# 🤖 AI Services
+# AI Services
 OPENAI_API_KEY=sk-your-openai-key-here
 OPENAI_MODEL=gpt-4                           # Primary chat model
 OPENAI_EMBEDDING_MODEL=text-embedding-ada-002 # Embedding model
 OPENAI_TEMPERATURE=0.1                       # Response creativity
 OPENAI_MAX_TOKENS=4000                       # Max response length
 
-# 🔍 Vector Database
+# Vector Database
 PINECONE_API_KEY=your-pinecone-key-here
 PINECONE_ENVIRONMENT=us-east-1-aws           # Pinecone region
 PINECONE_INDEX_NAME=genai-devops-assistant   # Index name
 
-# 🗄️ Database Configuration
+# Database Configuration
 POSTGRES_HOST=postgres                       # Container name
 POSTGRES_PORT=5432
 POSTGRES_DB=genai_devops
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=password
 
-# ⚡ Cache Configuration
+# Cache Configuration
 REDIS_HOST=redis                             # Container name
 REDIS_PORT=6379
 REDIS_PASSWORD=                              # Optional password
 
-# 🌐 Application Settings
+# Application Settings
 ENVIRONMENT=development                       # development/production
 REACT_APP_BACKEND_URL=http://localhost:8000  # Backend API URL
 REACT_APP_COLLAB_URL=http://localhost:8503   # Processing API URL
 ```
 
-## 🐳 Docker Operations
+## Docker Operations
 
 ### Basic Commands
 
 ```bash
-# 🚀 Start all services
+# Start all services
 docker compose up -d
 
-# 📊 View service status
+# View service status
 docker compose ps
 
-# 📋 View logs
+# View logs
 docker compose logs -f                    # All services
 docker compose logs -f backend frontend   # Specific services
 
-# 🛑 Stop all services
+# Stop all services
 docker compose down
 
-# 🔄 Restart specific service
+# Restart specific service
 docker compose restart backend
 
-# 🏗️ Rebuild and restart
+# Rebuild and restart
 docker compose up --build backend
 ```
 
 ### Development Commands
 
 ```bash
-# 🧹 Clean rebuild (removes containers and images)
+# Clean rebuild (removes containers and images)
 docker compose down --volumes --rmi all
 docker compose build --no-cache
 docker compose up -d
 
-# 🔍 Debug container
+# Debug container
 docker compose exec backend bash         # Access backend container
 docker compose exec postgres psql -U postgres genai_devops  # Database access
 
-# 📈 Monitor resources
+# Monitor resources
 docker stats                              # Resource usage
 docker compose top                        # Process information
 ```
 
-## 🔍 API Reference
+## API Reference
 
-### 🚀 Backend API (FastAPI) - Port 8000
+### Backend API (FastAPI) - Port 8000
 
 #### Query Processing
 ```bash
@@ -337,7 +337,7 @@ GET /health
 GET /stats
 ```
 
-### 🔄 Processing API (Flask) - Port 8503
+### Processing API (Flask) - Port 8503
 
 #### Document Ingestion
 ```bash
@@ -363,9 +363,9 @@ GET /api/status
 GET /health
 ```
 
-## 📝 Usage Examples
+## Usage Examples
 
-### 🤖 Chat API Usage
+### Chat API Usage
 
 ```python
 import requests
@@ -404,7 +404,7 @@ terraform_response = requests.post("http://localhost:8000/query/conversational",
     })
 ```
 
-### 📚 Document Ingestion
+### Document Ingestion
 
 ```python
 # Using the web interface (recommended)
@@ -442,25 +442,25 @@ ingestion_response = requests.post("http://localhost:8503/api/process",
     })
 ```
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
-### 🔧 Common Issues
+### Common Issues
 
 #### Docker & Services
 
 ```bash
-# 🐳 Docker services not starting
+# Docker services not starting
 docker compose down --volumes
 docker system prune -f
 docker compose build --no-cache
 docker compose up -d
 
-# 📊 Check service health
+# Check service health
 docker compose ps
 curl http://localhost:8000/health
 curl http://localhost:8503/health
 
-# 📋 View detailed logs
+# View detailed logs
 docker compose logs --tail=100 backend
 docker compose logs --tail=100 postgres
 ```
@@ -468,7 +468,7 @@ docker compose logs --tail=100 postgres
 #### Database Issues
 
 ```bash
-# 🗄️ PostgreSQL connection problems
+# PostgreSQL connection problems
 docker compose logs postgres
 docker compose exec postgres pg_isready -U postgres
 
@@ -485,10 +485,10 @@ docker compose exec postgres psql -U postgres -d genai_devops
 #### API & Configuration
 
 ```bash
-# 🔑 API key validation
+# API key validation
 # Verify .env file (no quotes around values)
-OPENAI_API_KEY=sk-your-key-here  # ✅ Correct
-OPENAI_API_KEY="sk-your-key-here"  # ❌ Wrong
+OPENAI_API_KEY=sk-your-key-here  # Correct
+OPENAI_API_KEY="sk-your-key-here"  # Wrong
 
 # Test API connectivity
 curl -H "Authorization: Bearer $OPENAI_API_KEY" \
@@ -501,7 +501,7 @@ python -c "import pinecone; pinecone.init(api_key='your-key'); print('Connected'
 #### Port Conflicts
 
 ```bash
-# 🌐 Check port availability
+# Check port availability
 netstat -tulpn | grep :3000  # Frontend
 netstat -tulpn | grep :8000  # Backend
 netstat -tulpn | grep :8503  # Processing
@@ -511,7 +511,7 @@ sudo lsof -ti:3000 | xargs kill -9
 sudo lsof -ti:8000 | xargs kill -9
 ```
 
-### 🔍 Performance Issues
+### Performance Issues
 
 #### Slow Query Responses
 
@@ -541,7 +541,7 @@ docker compose exec redis redis-cli flushall
 docker system prune -f
 ```
 
-### 🐛 Debug Mode
+### Debug Mode
 
 ```bash
 # Enable debug logging
@@ -556,7 +556,7 @@ curl http://localhost:8000/health | jq
 curl http://localhost:8503/api/status | jq
 ```
 
-### 📞 Getting Help
+### Getting Help
 
 1. **Check Logs**: Always start with `docker compose logs -f`
 2. **Health Endpoints**: Use `/health` endpoints for service status
@@ -564,7 +564,7 @@ curl http://localhost:8503/api/status | jq
 4. **System Validation**: Run `python scripts/validate_system.py`
 5. **GitHub Issues**: Report bugs with logs and configuration details
 
-## 🤝 Contributing
+## Contributing
 
 ### Development Setup
 
@@ -617,22 +617,22 @@ curl http://localhost:8503/api/status | jq
 
 ### Areas for Contribution
 
-- 🤖 **AI Improvements**: Enhanced prompts, new query types
-- 📚 **Document Loaders**: Support for new source types
-- 🎨 **UI/UX**: Interface improvements, mobile optimization
-- ⚡ **Performance**: Caching strategies, optimization
-- 🔒 **Security**: Authentication, authorization, input validation
-- 📊 **Monitoring**: Metrics, logging, observability
-- 🧪 **Testing**: Unit tests, integration tests, E2E tests
+- **AI Improvements**: Enhanced prompts, new query types
+- **Document Loaders**: Support for new source types
+- **UI/UX**: Interface improvements, mobile optimization
+- **Performance**: Caching strategies, optimization
+- **Security**: Authentication, authorization, input validation
+- **Monitoring**: Metrics, logging, observability
+- **Testing**: Unit tests, integration tests, E2E tests
 
-## 📚 Documentation
+## Documentation
 
 - **[Architectural Review](ARCHITECTURAL_REVIEW.md)**: Comprehensive technical documentation
 - **[Configuration Guide](docs/CONFIGURATION.md)**: Detailed setup instructions
 - **[API Documentation](http://localhost:8000/docs)**: Interactive API reference
 - **[Development Guide](docs/DEVELOPMENT.md)**: Development best practices
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - **LangChain**: RAG pipeline and document processing
 - **OpenAI**: GPT-4 and embedding models
@@ -640,14 +640,14 @@ curl http://localhost:8503/api/status | jq
 - **FastAPI**: High-performance API framework
 - **React**: Modern frontend framework
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🌟 Star History
+## Star History
 
-If you find this project helpful, please consider giving it a star! ⭐
+If you find this project helpful, please consider giving it a star!
 
 ---
 
-**Built with ❤️ for the DevOps community**
+**Built with care for the DevOps community**

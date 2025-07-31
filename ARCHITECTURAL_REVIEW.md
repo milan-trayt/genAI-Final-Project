@@ -4,7 +4,7 @@
 
 The GenAI-Powered DevOps Cloud Assistant is a sophisticated full-stack application that provides AWS infrastructure guidance through conversational AI. The system employs a clean three-tier architecture with clear separation of concerns: document ingestion (Collab), API processing (Backend), and user interface (Frontend).
 
-## 🏗️ System Architecture Overview
+## System Architecture Overview
 
 ```mermaid
 graph TB
@@ -52,7 +52,7 @@ graph TB
     J --> R
 ```
 
-## 📊 Function-Level Flow Analysis
+## Function-Level Flow Analysis
 
 ### 1. Document Ingestion Flow
 
@@ -279,7 +279,7 @@ sequenceDiagram
 - `similarity_search_with_score()` in **query_processor.py** - Vector similarity search
 - `get_cached_embeddings()` in **cache_manager.py** - Embedding cache management
 
-## 🔧 Core Components Analysis
+## Core Components Analysis
 
 ### Backend Components
 
@@ -316,7 +316,7 @@ sequenceDiagram
 | **Models** | `models.py` | Data models and source creation | Data structure definitions |
 | **Config** | `config.py` | Configuration management | System configuration |
 
-## 🚀 Key Features & Capabilities
+## Key Features & Capabilities
 
 ### 1. Multi-Modal Query Processing
 - **General Queries**: Standard AWS/DevOps questions with comprehensive responses
@@ -342,7 +342,7 @@ sequenceDiagram
 - **Lazy Loading**: On-demand component initialization
 - **Fallback Mechanisms**: Graceful degradation with multiple retry strategies
 
-## 🔒 Security & Validation
+## Security & Validation
 
 ### Guardrail System Implementation
 
@@ -368,7 +368,7 @@ async def _validate_query_with_guardrail(self, query: str, session_id: Optional[
 - **Rate Limiting**: Built-in FastAPI rate limiting capabilities
 - **CORS Configuration**: Proper cross-origin resource sharing setup
 
-## 📈 Performance Metrics & Optimization
+## Performance Metrics & Optimization
 
 ### Response Times
 - **Cached Queries**: ~100-200ms (Redis cache hits)
@@ -388,7 +388,7 @@ async def _validate_query_with_guardrail(self, query: str, session_id: Optional[
 - **Batch Processing**: Efficient batch operations for embeddings and database writes
 - **Smart Retrieval**: Tag-based filtering to reduce vector search scope
 
-## 🔄 Data Flow Architecture
+## Data Flow Architecture
 
 ### Request Processing Pipeline
 1. **Frontend Validation** → Input sanitization and query type selection
@@ -418,7 +418,7 @@ async def _validate_query_with_guardrail(self, query: str, session_id: Optional[
 | **AI/ML** | OpenAI GPT-4, text-embedding-ada-002 | Language processing and embeddings | Advanced reasoning, high-quality embeddings, context understanding |
 | **Infrastructure** | Docker, Docker Compose, Nginx | Containerization and deployment | Service orchestration, load balancing, development environment |
 
-## 🎯 Architectural Strengths
+## Architectural Strengths
 
 ### Design Principles
 1. **Clear Separation of Concerns**: Each layer has distinct, well-defined responsibilities
@@ -437,7 +437,7 @@ async def _validate_query_with_guardrail(self, query: str, session_id: Optional[
 - **Health Checks**: Built-in health monitoring for all services
 - **Graceful Degradation**: Fallback mechanisms for external service failures
 
-## 📋 Deployment Architecture
+## Deployment Architecture
 
 ### Docker Compose Configuration
 
@@ -464,7 +464,7 @@ services:
 - **Environment Variables**: Comprehensive configuration management
 - **Health Monitoring**: Built-in health checks for all services
 
-## 🔍 API Endpoints Reference
+## API Endpoints Reference
 
 ### Backend (FastAPI) - Port 8000
 

@@ -170,7 +170,7 @@ class WebSocketServer:
 
             
         except Exception as e:
-            logger.error(f"❌ Failed to emit update to session {session_id}: {e}")
+            logger.error(f"Failed to emit update to session {session_id}: {e}")
     
     def get_session_info(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get information about a specific session"""

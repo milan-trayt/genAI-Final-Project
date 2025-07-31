@@ -375,7 +375,7 @@ const ChatInterface = () => {
     <div className="chat-interface">
       <div className="chat-sidebar">
         <div className="sidebar-header">
-          <h3>💬 Chat Sessions</h3>
+          <h3>Chat Sessions</h3>
           <button onClick={createNewSession} className="new-session">
             <Plus size={16} /> New Chat
           </button>
@@ -409,7 +409,7 @@ const ChatInterface = () => {
             onClick={() => setShowQuickModal(true)}
             className="quick-modal-button"
           >
-            ⚡ Quick Response
+            Quick Response
           </button>
         </div>
       </div>
@@ -435,7 +435,7 @@ const ChatInterface = () => {
             </div>
             {sessions.length > 0 && (
               <div className="session-indicators">
-                <h3>📊 Current Sessions: {sessions.length}</h3>
+                <h3>Current Sessions: {sessions.length}</h3>
                 <div className="session-list">
                   {sessions.map(session => (
                     <div key={session.id} className="session-indicator">
@@ -510,7 +510,7 @@ const ChatInterface = () => {
         <div className="modal-overlay" onClick={closeQuickModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>⚡ Quick Response</h3>
+              <h3>Quick Response</h3>
               <button onClick={closeQuickModal} className="modal-close">
                 <X size={20} />
               </button>
@@ -537,7 +537,7 @@ const ChatInterface = () => {
                       Processing...
                     </>
                   ) : (
-                    '⚡ Ask'
+                    'Ask'
                   )}
                 </button>
               </div>

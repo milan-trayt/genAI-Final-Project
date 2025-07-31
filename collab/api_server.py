@@ -78,20 +78,20 @@ def process_documents():
                 try:
                     parsed_input = json.loads(input_data)
                     sources = parsed_input.get('sources', [])
-                    ws_server.emit_log(session_id, f'🔧 Starting processing of {len(sources)} sources...')
-                    ws_server.emit_log(session_id, f'📊 Processing configuration: chunk_size=1000, chunk_overlap=200')
+                    ws_server.emit_log(session_id, f'Starting processing of {len(sources)} sources...')
+                    ws_server.emit_log(session_id, f'Processing configuration: chunk_size=1000, chunk_overlap=200')
                     
                     # Process each source
                     for i, source in enumerate(sources):
                         # Check if processing should stop
                         if app.stop_flags.get(session_id, False):
-                            ws_server.emit_log(session_id, '🛑 Processing stopped by user', 'info')
-                            ws_server.emit_completion(session_id, False, '🛑 Processing stopped by user')
+                            ws_server.emit_log(session_id, 'Processing stopped by user', 'info')
+                            ws_server.emit_completion(session_id, False, 'Processing stopped by user')
                             return
                         
                         source_name = source.get("name", "unknown")
                         source_type = source.get('type', 'unknown')
-                        ws_server.emit_log(session_id, f'📋 [{i+1}/{len(sources)}] Processing {source_type.upper()}: {source_name}')
+                        ws_server.emit_log(session_id, f'[{i+1}/{len(sources)}] Processing {source_type.upper()}: {source_name}')
                         ws_server.emit_progress(session_id, i + 1, len(sources), source_name)
                         
                         # Call the original processing endpoint
@@ -131,7 +131,7 @@ def process_documents():
                         elif source_type == 'csv':
                             source_obj = create_csv_source(source['path'], source.get('docType', 'csv_document'))
                         else:
-                            ws_server.emit_log(session_id, f'❌ Unknown source type: {source_type}', 'error')
+                            ws_server.emit_log(session_id, f'Unknown source type: {source_type}', 'error')
                             continue
                         
                         # Add custom metadata to source
@@ -140,7 +140,7 @@ def process_documents():
                             
                         temp_ingestion.document_sources = [source_obj]
                         
-                        ws_server.emit_log(session_id, f'🔄 Loading documents from {source_type}...')
+                        ws_server.emit_log(session_id, f'Loading documents from {source_type}...')
                         try:
                             # Add timing
                             import time
@@ -148,25 +148,25 @@ def process_documents():
                             temp_ingestion.process_documents(session_id)
                             end_time = time.time()
                             processing_time = end_time - start_time
-                            ws_server.emit_log(session_id, f'✅ [{i+1}/{len(sources)}] Completed {source_name} in {processing_time:.2f}s')
+                            ws_server.emit_log(session_id, f'[{i+1}/{len(sources)}] Completed {source_name} in {processing_time:.2f}s')
                         except Exception as source_error:
                             error_msg = str(source_error)
-                            ws_server.emit_log(session_id, f'❌ [{i+1}/{len(sources)}] Failed {source_name}: {error_msg}', 'error')
+                            ws_server.emit_log(session_id, f'[{i+1}/{len(sources)}] Failed {source_name}: {error_msg}', 'error')
                     
                     # Emit completion with stats
                     total_time = time.time() - ws_server.active_sessions[session_id]['start_time'].timestamp()
-                    ws_server.emit_log(session_id, f'🎉 Processing completed successfully!')
-                    ws_server.emit_log(session_id, f'📊 Summary: {len(sources)} sources processed in {total_time:.2f}s')
+                    ws_server.emit_log(session_id, f'Processing completed successfully!')
+                    ws_server.emit_log(session_id, f'Summary: {len(sources)} sources processed in {total_time:.2f}s')
                     ws_server.emit_log(session_id, f'💾 Documents have been indexed and are ready for querying')
                     
                     stats = {
                         'total_sources': len(sources),
                         'processing_time': total_time
                     }
-                    ws_server.emit_completion(session_id, True, '🎉 All sources processed successfully!', stats)
+                    ws_server.emit_completion(session_id, True, 'All sources processed successfully!', stats)
                     
                 except Exception as e:
-                    ws_server.emit_completion(session_id, False, f'❌ Processing failed: {str(e)}')
+                    ws_server.emit_completion(session_id, False, f'Processing failed: {str(e)}')
                     
                 finally:
                     # Clean up session data
@@ -253,24 +253,24 @@ def upload_file():
         return response
     
     print(f"📤 Upload request received")
-    print(f"📋 Request files: {list(request.files.keys())}")
-    print(f"📋 Request form: {dict(request.form)}")
+    print(f"Request files: {list(request.files.keys())}")
+    print(f"Request form: {dict(request.form)}")
     
     try:
         if 'file' not in request.files:
-            print("❌ No file in request")
+            print("No file in request")
             return jsonify({"status": "error", "message": "No file provided"}), 400
         
         file = request.files['file']
-        print(f"📁 File received: {file.filename}, Content-Type: {file.content_type}")
+        print(f"File received: {file.filename}, Content-Type: {file.content_type}")
         
         if file.filename == '':
-            print("❌ Empty filename")
+            print("Empty filename")
             return jsonify({"status": "error", "message": "No file selected"}), 400
         
         # Create uploads directory in current working directory
         uploads_dir = os.path.join(os.getcwd(), 'uploads')
-        print(f"📁 Creating uploads directory: {uploads_dir}")
+        print(f"Creating uploads directory: {uploads_dir}")
         os.makedirs(uploads_dir, exist_ok=True)
         
         # Save file with safe filename
@@ -281,15 +281,15 @@ def upload_file():
         try:
             file.save(filepath)
             file_size = os.path.getsize(filepath)
-            print(f"✅ File saved successfully: {filename} ({file_size} bytes)")
+            print(f"File saved successfully: {filename} ({file_size} bytes)")
         except Exception as save_error:
-            print(f"❌ Failed to save file: {str(save_error)}")
+            print(f"Failed to save file: {str(save_error)}")
             return jsonify({
                 "status": "error",
                 "message": f"Failed to save file: {str(save_error)}"
             }), 500
         
-        print(f"🎉 Upload completed successfully: {filename}")
+        print(f"Upload completed successfully: {filename}")
         return jsonify({
             "status": "success",
             "message": "File uploaded successfully",
