@@ -43,6 +43,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      network: host
     container_name: genai-backend
     network_mode: host
     environment:
@@ -96,6 +97,7 @@ services:
     build:
       context: ./collab
       dockerfile: Dockerfile
+      network: host
     container_name: genai-collab
     ports:
       - "8888:8888"
